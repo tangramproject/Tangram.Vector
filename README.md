@@ -1,5 +1,5 @@
 ## Running a node
-To be enabled in the coming 3 - 5 days
+Coming soon..
 
 Detailed instructions will be provided, including how to build, install and get started with using and participating in test-net1, along with some extra tips and tricks. A Docker container is one of the priorities to ensure an ease of getting onboard with Vector. 
 

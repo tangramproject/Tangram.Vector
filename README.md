@@ -26,6 +26,7 @@ If you'd like to contribute to Tangram Vector (Node code), please know we're cur
 
 ## Building Vector
 git clone https://github.com/tangramproject/Tangram.Vector
+
 cd VectorContainers  
 dotnet restore  
 dotnet publish TGMGateway --output TGMGateway/publish --configuration Release  

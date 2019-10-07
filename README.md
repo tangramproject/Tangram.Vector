@@ -25,6 +25,7 @@ If you’re thinking about starting a project and need support we thank you for 
 If you'd like to contribute to Tangram Vector (Node code), please know we're currently accepting issues, forks, fixes, commits and pull requests so that maintainers can review and merge into the main code base. If you wish to submit more complex changes, please check up with the core devs first on [Discord Channel](https://discord.gg/cZ8NtsY) to ensure the changes get some early feedback which can make both your efforts much lighter as well as review quick and simple.
 
 ## Building Vector
+git clone https://github.com/tangramproject/Tangram.Vector
 cd VectorContainers  
 dotnet restore  
 dotnet publish TGMGateway --output TGMGateway/publish --configuration Release  

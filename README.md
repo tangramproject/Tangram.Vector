@@ -27,8 +27,8 @@ If you'd like to contribute to Tangram Vector (Node code), please know we're cur
 ## Building Vector
 cd VectorContainers  
 dotnet restore  
-dotnet publish TGMGateway --output publish --configuration Release  
-dotnet publish Coin.API --output publish --configuration Release  
-dotnet publish MessagePool.API --output publish --configuration Release  
-dotnet publish Onion.API --output publish --configuration Release  
-dotnet publish Membership.API --output publish --configuration Release   
+dotnet publish TGMGateway --output TGMGateway/publish --configuration Release  
+dotnet publish Coin.API --output Coin.API/publish --configuration Release
+dotnet publish MessagePool.API --output MessagePool.API/publish --configuration Release
+dotnet publish Onion.API --output Onion.API/publish --configuration Release
+dotnet publish Membeship.API --output Membership.API/publish --configuration Release

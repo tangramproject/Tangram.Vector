@@ -12,10 +12,12 @@ jobs:
         token: ${{secrets.github_token}}        
     - name: Print new build number
       run: echo Build number is $BUILD_NUMBER
-    - name: Build Vector
+    - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: '3.0.100' # SDK Version to use.
+    - name: Build Vector
+      uses: actions/checkout@master
     - run:  |
         cd VectorContainers
         wget https://download.octopusdeploy.com/octopus-tools/6.13.1/OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz

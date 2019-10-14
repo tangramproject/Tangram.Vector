@@ -1,18 +1,17 @@
-name: CI
+name: Build Vector Node
 
 on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - name: Generate build number
       id: buildnumber
       uses: einaregilsson/build-number@v1 
       with:
         token: ${{ secrets.github_token }}
+
     - name: Build Vector
     - uses: actions/checkout@master
     - uses: actions/setup-dotnet@v1

@@ -37,7 +37,7 @@ namespace Coin.API.Providers
 
             try
             {
-                var blockHash = BlockHash(blockGraph.Block.SignedBlock.Coin, nodeId, round, publicKey.ToHex());
+                var blockHash = BlockHash(blockGraph.Block.SignedBlock.Coin.Stamp, nodeId, round, publicKey.ToHex());
                 var coinHash = HashCoin(blockGraph.Block.SignedBlock.Coin, publicKey.ToHex());
                 var combinedHash = Util.Combine(blockHash, coinHash);
                 var signedHash = await onionServiceClient.SignHashAsync(combinedHash);
@@ -72,21 +72,21 @@ namespace Coin.API.Providers
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="coin"></param>
+        /// <param name="stamp"></param>
         /// <param name="node"></param>
         /// <param name="round"></param>
         /// <param name="publicKey"></param>
         /// <returns></returns>
-        public byte[] BlockHash(CoinProto coin, ulong node, ulong round, string publicKey)
+        public byte[] BlockHash(string stamp, ulong node, ulong round, string publicKey)
         {
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
+            if (string.IsNullOrEmpty(stamp))
+                throw new ArgumentNullException(nameof(stamp));
 
             if (node <= 0)
                 throw new ArgumentOutOfRangeException(nameof(node));
 
             if (round <= 0)
-                throw new ArgumentOutOfRangeException(nameof(coin));
+                throw new ArgumentOutOfRangeException(nameof(round));
 
             if (string.IsNullOrEmpty(publicKey))
                 throw new ArgumentNullException(nameof(publicKey));
@@ -95,7 +95,7 @@ namespace Coin.API.Providers
 
             try
             {
-                hash = Cryptography.GenericHashWithKey($"{coin.Stamp}{node}{round}", publicKey.FromHex());
+                hash = Cryptography.GenericHashWithKey($"{stamp}{node}{round}", publicKey.FromHex());
             }
             catch (Exception ex)
             {

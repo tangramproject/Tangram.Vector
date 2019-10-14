@@ -261,7 +261,7 @@ namespace Coin.API.Services
             try
             {
                 var signedBlock = blockIDProto.SignedBlock;
-                var blockHash = signingProvider.BlockHash(signedBlock.Coin, (uint)blockIDProto.Node, (uint)blockIDProto.Round, signedBlock.PublicKey);
+                var blockHash = signingProvider.BlockHash(signedBlock.Coin.Stamp, blockIDProto.Node, blockIDProto.Round, signedBlock.PublicKey);
                 var coinHash = signingProvider.HashCoin(signedBlock.Coin, signedBlock.PublicKey);
                 var combinedHash = Util.Combine(blockHash, coinHash);
 
@@ -601,10 +601,6 @@ namespace Coin.API.Services
 
                         Graph.Add(x.ToBlockGraph());
                     }
-                }
-                catch (Raven.Client.Exceptions.InvalidQueryException ex)
-                {
-                    logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: {ex.ToString()}");
                 }
                 catch (Exception ex)
                 {

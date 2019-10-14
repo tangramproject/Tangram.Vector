@@ -16,19 +16,20 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: '3.0.100' # SDK Version to use.
-    - name: Build Vector
+    - name: Checkout latest
       uses: actions/checkout@master
+    - name: Build Vector
       env:
         OCTOPUS_CLI_SERVER: ${{secrets.OCTOPUS_CLI_SERVER}}
         OCTOPUS_CLI_API_KEY: ${{secrets.OCTOPUS_CLI_API_KEY}}
-    - run:  |
+      run:  |
         cd VectorContainers
         wget https://download.octopusdeploy.com/octopus-tools/6.13.1/OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz
         tar -xvzf OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz
         dotnet restore VectorContainers.sln
         dotnet publish Coin.API --output Coin.API/publish --configuration Release
         ./Octo pack --id Tangram.Coin.API --version 2.$BUILD_NUMBER --basePath "Coin.API/publish"
-        ./Octo push --package=Tangram.Coin.API.2.$BUILD_NUMBER.nupkg --server=$OCTOPUS_CLI_SERVER --apiKey=$OCTOPUS_CLI_API_KEY
+        ./Octo push --package=Tangram.Coin.API.2.$BUILD_NUMBER.nupkg
         dotnet publish MessagePool.API --output publish --configuration Release
         dotnet publish Onion.API --output publish --configuration Release
         dotnet publish Membership.API --output publish --configuration Release

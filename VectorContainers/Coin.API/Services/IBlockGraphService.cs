@@ -7,6 +7,8 @@ namespace Coin.API.Services
 {
     public interface IBlockGraphService
     {
+        bool IsSynchronized { get; }
+        void SetSynchronized(bool synced);
         Task<BlockGraphProto> AddBlockGraph(BlockGraphProto block);
         bool ValidateRule(CoinProto coin);
         bool VerifiySignature(BlockIDProto blockIDProto);

@@ -18,6 +18,8 @@ namespace Coin.API.Services
 {
     public class BlockGraphService : IBlockGraphService
     {
+        public bool IsSynchronized { get; private set; }
+
         private const int processBlocksInterval = 1 * 60 * 32;
         private const int requiredNodeCount = 4;
 
@@ -66,6 +68,11 @@ namespace Coin.API.Services
                 logger.LogWarning($"<<< Initialize >>>: Minimum number of nodes required (4). Total number of nodes ({totalNodes})");
             }
 
+            while (!IsSynchronized)
+            {
+                await Task.Delay(1000);
+            }
+
             lastInterpreted = await unitOfWork.Interpreted.GetRound();
             lastInterpreted = lastInterpreted > 0 ? lastInterpreted - 1 : lastInterpreted;
 
@@ -77,6 +84,15 @@ namespace Coin.API.Services
             processBlocksTimer = new Timer((state) => ProcessBlocks().SwallowException(), null, processBlocksInterval, System.Threading.Timeout.Infinite);
 
             logger.LogInformation("<<< Initialize >>>: Started Block Graph Service.");
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="synced"></param>
+        public void SetSynchronized(bool synced)
+        {
+            IsSynchronized = synced;
         }
 
         /// <summary>

@@ -16,7 +16,6 @@ namespace Coin.API.Providers
     public class SyncProvider
     {
         public bool IsRunning { get; private set; }
-        public bool IsSynchronized { get; private set; }
 
         private readonly IBlockGraphService blockGraphService;
         private readonly IUnitOfWork unitOfWork;
@@ -61,13 +60,13 @@ namespace Coin.API.Providers
                     if (total.Equals(network))
                     {
                         unitOfWork.Interpreted.Store(network, network);
-                        IsSynchronized = true;
+                        blockGraphService.SetSynchronized(true);
                     }
 
                     return;
                 }
 
-                IsSynchronized = true;
+                blockGraphService.SetSynchronized(true);
             }
             catch (Exception ex)
             {
@@ -75,6 +74,15 @@ namespace Coin.API.Providers
             }
 
             IsRunning = false;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public bool GetIsSynchronized()
+        {
+            return blockGraphService.IsSynchronized;
         }
 
         /// <summary>

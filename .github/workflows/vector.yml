@@ -28,7 +28,7 @@ jobs:
         dotnet restore VectorContainers.sln
         dotnet publish Coin.API --output Coin.API/publish --configuration Release
         ./Octo pack --id Tangram.Coin.API --version 2.$BUILD_NUMBER --basePath "Coin.API/publish"
-        ./Octo push --package=Tangram.Coin.API.2.$BUILD_NUMBER.nupkg
+        ./Octo push --package=Tangram.Coin.API.2.$BUILD_NUMBER.nupkg --server $OCTOPUS_CLI_SERVER --apiKey $OCTOPUS_CLI_API_KEY
         dotnet publish MessagePool.API --output publish --configuration Release
         dotnet publish Onion.API --output publish --configuration Release
         dotnet publish Membership.API --output publish --configuration Release

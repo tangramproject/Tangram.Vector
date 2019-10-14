@@ -12,24 +12,32 @@ jobs:
         token: ${{secrets.github_token}}        
     - name: Print new build number
       run: echo Build number is $BUILD_NUMBER
-    - name: Setup .NET Core
+    - name: Setup .NET Core 3.0
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: '3.0.100' # SDK Version to use.
     - name: Checkout latest
       uses: actions/checkout@master
     - name: Build Vector
+      run:  |
+        cd VectorContainers
+        dotnet restore VectorContainers.sln
+        dotnet publish Coin.API --output Coin.API/publish --configuration Release
+        dotnet publish MessagePool.API --output publish/MessagePool.API --configuration Release
+        dotnet publish Onion.API --output publish/Onion.API --configuration Release
+        dotnet publish Membership.API --output publish/Membership.API --configuration Release
+    - name: Push to Octopus
       env:
         OCTOPUS_CLI_SERVER: ${{secrets.OCTOPUS_CLI_SERVER}}
         OCTOPUS_CLI_API_KEY: ${{secrets.OCTOPUS_CLI_API_KEY}}
-      run:  |
-        cd VectorContainers
+      run: |
         wget https://download.octopusdeploy.com/octopus-tools/6.13.1/OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz
         tar -xvzf OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz
-        dotnet restore VectorContainers.sln
-        dotnet publish Coin.API --output Coin.API/publish --configuration Release
         ./Octo pack --id Tangram.Coin.API --version 2.$BUILD_NUMBER --basePath "Coin.API/publish"
         ./Octo push --package=Tangram.Coin.API.2.$BUILD_NUMBER.nupkg
-        dotnet publish MessagePool.API --output publish --configuration Release
-        dotnet publish Onion.API --output publish --configuration Release
-        dotnet publish Membership.API --output publish --configuration Release
+        ./Octo pack --id MessagePool.API --version 2.$BUILD_NUMBER --basePath "MessagePool.API/publish"
+        ./Octo push --package=MessagePool.API.2.$BUILD_NUMBER.nupkg
+        ./Octo pack --id Onion.API --version 2.$BUILD_NUMBER --basePath "Onion.API/publish"
+        ./Octo push --package=Onion.API.2.$BUILD_NUMBER.nupkg
+        ./Octo pack --id Membership.API --version 2.$BUILD_NUMBER --basePath "Membership.API/publish"
+        ./Octo push --package=Membership.API.2.$BUILD_NUMBER.nupkg

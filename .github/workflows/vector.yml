@@ -30,6 +30,7 @@ jobs:
         dotnet publish MessagePool.API --output publish/MessagePool.API --configuration Release
         dotnet publish Onion.API --output publish/Onion.API --configuration Release
         dotnet publish Membership.API --output publish/Membership.API --configuration Release
+        dotnet publish TGMGateway --output publish/TGMGateway --configuration Release
     - name: Push to Octopus
       env:
         OCTOPUS_CLI_SERVER: ${{secrets.OCTOPUS_CLI_SERVER}}
@@ -46,3 +47,5 @@ jobs:
         ./Octo push --package=Tangram.Onion.API.2.$BUILD_NUMBER.nupkg
         ./Octo pack --id Tangram.Membership.API --version 2.$BUILD_NUMBER --basePath "publish/Membership.API"
         ./Octo push --package=Tangram.Membership.API.2.$BUILD_NUMBER.nupkg
+        ./Octo pack --id Tangram.Gateway --version 2.$BUILD_NUMBER --basePath "publish/TGMGateway"
+        ./Octo push --package=Tangram.Gateway.2.$BUILD_NUMBER.nupkg

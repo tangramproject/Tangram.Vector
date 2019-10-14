@@ -24,8 +24,8 @@ jobs:
         tar -xvzf OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz
         dotnet restore VectorContainers.sln
         dotnet publish Coin.API --output Coin.API/publish --configuration Release
-        ./Octo pack --id Tangram.Coin.API --version 1.${{ steps.buildnumber.outputs.build_number }} --basePath "Coin.API/publish"
-        ./Octo push --package=Tangram.Coin.API.1.${{ steps.buildnumber.outputs.build_number }}.nupkg
+        ./Octo pack --id Tangram.Coin.API --version 1.$BUILD_NUMBER --basePath "Coin.API/publish"
+        ./Octo push --package=Tangram.Coin.API.1.$BUILD_NUMBER.nupkg
         dotnet publish MessagePool.API --output publish --configuration Release
         dotnet publish Onion.API --output publish --configuration Release
         dotnet publish Membership.API --output publish --configuration Release

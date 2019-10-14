@@ -12,6 +12,10 @@ jobs:
         token: ${{secrets.github_token}}        
     - name: Print new build number
       run: echo Build number is $BUILD_NUMBER
+    - name: Setup .NET Core 2.2
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '2.2.402' # SDK Version to use.
     - name: Setup .NET Core 3.0
       uses: actions/setup-dotnet@v1
       with:
@@ -37,8 +41,8 @@ jobs:
         ./Octo pack --id Tangram.Coin.API --version 2.$BUILD_NUMBER --basePath "publish/Coin.API"
         ./Octo push --package=Tangram.Coin.API.2.$BUILD_NUMBER.nupkg
         ./Octo pack --id Tangram.MessagePool.API --version 2.$BUILD_NUMBER --basePath "publish/MessagePool.API"
-        ./Octo push --package=MessagePool.API.2.$BUILD_NUMBER.nupkg
+        ./Octo push --package=Tangram.MessagePool.API.2.$BUILD_NUMBER.nupkg
         ./Octo pack --id Tangram.Onion.API --version 2.$BUILD_NUMBER --basePath "publish/Onion.API"
-        ./Octo push --package=Onion.API.2.$BUILD_NUMBER.nupkg
+        ./Octo push --package=Tangram.Onion.API.2.$BUILD_NUMBER.nupkg
         ./Octo pack --id Tangram.Membership.API --version 2.$BUILD_NUMBER --basePath "publish/Membership.API"
-        ./Octo push --package=Membership.API.2.$BUILD_NUMBER.nupkg
+        ./Octo push --package=Tangram.Membership.API.2.$BUILD_NUMBER.nupkg

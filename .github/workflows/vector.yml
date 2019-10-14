@@ -22,7 +22,7 @@ jobs:
       run:  |
         cd VectorContainers
         dotnet restore VectorContainers.sln
-        dotnet publish Coin.API --output Coin.API/publish --configuration Release
+        dotnet publish Coin.API --output publish/Coin.API --configuration Release
         dotnet publish MessagePool.API --output publish/MessagePool.API --configuration Release
         dotnet publish Onion.API --output publish/Onion.API --configuration Release
         dotnet publish Membership.API --output publish/Membership.API --configuration Release
@@ -34,11 +34,11 @@ jobs:
         cd VectorContainers
         wget https://download.octopusdeploy.com/octopus-tools/6.13.1/OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz
         tar -xvzf OctopusTools.6.13.1.ubuntu.16.04-x64.tar.gz
-        ./Octo pack --id Tangram.Coin.API --version 2.$BUILD_NUMBER --basePath "Coin.API/publish"
+        ./Octo pack --id Tangram.Coin.API --version 2.$BUILD_NUMBER --basePath "publish/Coin.API"
         ./Octo push --package=Tangram.Coin.API.2.$BUILD_NUMBER.nupkg
-        ./Octo pack --id MessagePool.API --version 2.$BUILD_NUMBER --basePath "MessagePool.API/publish"
+        ./Octo pack --id MessagePool.API --version 2.$BUILD_NUMBER --basePath "publish/MessagePool.API"
         ./Octo push --package=MessagePool.API.2.$BUILD_NUMBER.nupkg
-        ./Octo pack --id Onion.API --version 2.$BUILD_NUMBER --basePath "Onion.API/publish"
+        ./Octo pack --id Onion.API --version 2.$BUILD_NUMBER --basePath "publish/Onion.API"
         ./Octo push --package=Onion.API.2.$BUILD_NUMBER.nupkg
-        ./Octo pack --id Membership.API --version 2.$BUILD_NUMBER --basePath "Membership.API/publish"
+        ./Octo pack --id Membership.API --version 2.$BUILD_NUMBER --basePath "publish/Membership.API"
         ./Octo push --package=Membership.API.2.$BUILD_NUMBER.nupkg

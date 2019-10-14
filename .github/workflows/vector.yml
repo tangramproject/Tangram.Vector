@@ -13,6 +13,7 @@ jobs:
       with:
         dotnet-version: '3.0.100' # SDK Version to use.
     - run:  |
+        sudo apt-get install dotnet-sdk-2.2
         cd VectorContainers
         wget https://download.octopusdeploy.com/octopus-tools/6.13.1/OctopusTools.6.13.1.portable.tar.gz
         tar -xvzf OctopusTools.6.13.1.portable.tar.gz

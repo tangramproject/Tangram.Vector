@@ -31,6 +31,8 @@ namespace SwimProtocol.Converters
                     return new PingMessage();
                 case MessageType.PingReq:
                     return new PingReqMessage();
+                case MessageType.Suspect:
+                    return new SuspectMessage();
                 default:
                     return null;
             }

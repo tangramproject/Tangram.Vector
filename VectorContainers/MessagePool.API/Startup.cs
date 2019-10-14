@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Diagnostics;
-using Autofac;
-using Autofac.Extensions.DependencyInjection;
-using Core.API.Helper;
+using System.Net.Http;
+using Core.API.Broadcast;
+using Core.API.Membership;
 using Core.API.Model;
+using Core.API.Onion;
 using MessagePool.API.Services;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Swashbuckle.AspNetCore.Swagger;
 
 namespace MessagePool.API
 {
@@ -26,54 +26,75 @@ namespace MessagePool.API
             {
                 Debug.WriteLine(eventArgs.Exception.ToString());
             };
-
-            CreateLMDBDirectory();
         }
 
-        public IServiceProvider ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc();
+            services.AddResponseCompression();
+
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+            services.AddMvc(option => option.EnableEndpointRouting = false);
+
+            services.AddControllers();
+
             services.AddSwaggerGen(options =>
             {
-                options.DescribeAllEnumsAsStrings();
-                options.SwaggerDoc("v1", new Info
+                options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
                 {
-                    Title = "Tangram Message Pool HTTP API",
+                    License = new Microsoft.OpenApi.Models.OpenApiLicense
+                    {
+                        Name = "Attribution-NonCommercial-NoDerivatives 4.0 International",
+                        Url = new Uri("https://raw.githubusercontent.com/tangramproject/Tangram.Vector/initial/LICENSE")
+                    },
+                    Title = "Tangram MessagePool HTTP API",
                     Version = "v1",
-                    Description = "Messages sent between sender and receiver.",
-                    TermsOfService = "https://tangrams.io/legal/",
-                    Contact = new Contact() { Email = "dev@getsneak.org", Url = "https://tangrams.io/about-tangram/team/" }
+                    Description = "Backend services.",
+                    TermsOfService = new Uri("https://tangrams.io/legal/"),
+                    Contact = new Microsoft.OpenApi.Models.OpenApiContact
+                    {
+                        Email = "dev@getsneak.org",
+                        Url = new Uri("https://tangrams.io/about-tangram/team/")
+                    }
                 });
-            });
-            services.AddCors(options =>
-            {
-                options.AddPolicy("CorsPolicy",
-                    builder => builder.AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials());
             });
 
             services.AddHttpContextAccessor();
 
-            services.AddSingleton<IUnitOfWork, UnitOfWork>(sp =>
-            {
-                var logger = sp.GetRequiredService<ILogger<UnitOfWork>>();
-                var filePath = Configuration["LMDB:FilePath"];
-                return new UnitOfWork(filePath, logger);
-            });
+            services.AddTransient<IBroadcastClient, BroadcastClient>();
 
+            services.AddHttpClient<ITorClient, TorClient>()
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler((services, request) =>
+                    {
+                        var logger = services.GetService<ILogger<Startup>>();
+
+                        if (request.Method == HttpMethod.Get)
+                        {
+                            return Core.API.Helper.PollyEx.GetRetryPolicyAsync(logger);
+                        }
+
+                        if (request.Method == HttpMethod.Post)
+                        {
+                            return Core.API.Helper.PollyEx.GetNoOpPolicyAsync();
+                        }
+
+                        return Core.API.Helper.PollyEx.GetRetryPolicy();
+                    });
+
+
+            services.AddSingleton<IDbContext, DbContext>();
+            services.AddSingleton<IUnitOfWork, UnitOfWork>();
+
+            services.AddSingleton<IOnionServiceClientConfiguration, OnionServiceClientConfiguration>();
+            services.AddHttpClient<IOnionServiceClient, OnionServiceClient>();
+
+            services.AddTransient<IMembershipServiceClient, MembershipServiceClient>();
             services.AddTransient<IMessagePoolService, MessagePoolService>();
 
             services.AddOptions();
-
-            var container = new ContainerBuilder();
-            container.Populate(services);
-
-            return new AutofacServiceProvider(container.Build());
         }
 
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)
         {
             var pathBase = Configuration["PATH_BASE"];
             if (!string.IsNullOrEmpty(pathBase))
@@ -82,8 +103,12 @@ namespace MessagePool.API
             }
 
             app.UseStaticFiles();
-            app.UseCors("CorsPolicy");
-            app.UseMvcWithDefaultRoute();
+            app.UseRouting();
+            app.UseCors("default");
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
 
             app.UseSwagger()
                .UseSwaggerUI(c =>
@@ -92,13 +117,6 @@ namespace MessagePool.API
                    c.OAuthClientId("messagepoolswaggerui");
                    c.OAuthAppName("Message Pool Swagger UI");
                });
-        }
-
-        private void CreateLMDBDirectory()
-        {
-            var LmdbPath = System.IO.Path.Combine(Util.EntryAssemblyPath(), Configuration["LMDB:FilePath"]);
-            if (!System.IO.Directory.Exists(LmdbPath))
-                System.IO.Directory.CreateDirectory(LmdbPath);
         }
     }
 }

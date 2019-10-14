@@ -1,5 +1,6 @@
-﻿using Core.API;
+using Core.API;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using NUlid;
@@ -10,7 +11,9 @@ using SwimProtocol.Repositories;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +21,7 @@ using System.Timers;
 
 namespace SwimProtocol
 {
-    public class FailureDetection : HostedService, ISwimProtocol
+    public class FailureDetection : BackgroundService, ISwimProtocol
     {
         private readonly StateMachine<SwimFailureDetectionState, SwimFailureDetectionTrigger> _stateMachine;
         private readonly ISwimProtocolProvider _swimProtocolProvider;
@@ -29,6 +32,7 @@ namespace SwimProtocol
         private readonly System.Timers.Timer _pingTimer;
 
         private ConcurrentQueue<ISwimNode> _nodes { get; set; } = new ConcurrentQueue<ISwimNode>();
+
         private ConcurrentDictionaryEx<Ulid, MessageBase> CorrelatedMessages { get; set; } = new ConcurrentDictionaryEx<Ulid, MessageBase>(200);
         private ConcurrentBag<BroadcastableItem> BroadcastQueue { get; set; } = new ConcurrentBag<BroadcastableItem>();
 
@@ -52,7 +56,7 @@ namespace SwimProtocol
 
             _nodeRepository = new NodeRepository(swimProtocolProvider.Node.Hostname);
 
-            _protocolTimer = new System.Timers.Timer(10000);
+            _protocolTimer = new System.Timers.Timer(7000);
             _pingTimer = new System.Timers.Timer(3500);
             _protocolTimer.AutoReset = false;
             _pingTimer.AutoReset = false;
@@ -79,8 +83,8 @@ namespace SwimProtocol
                 .Permit(SwimFailureDetectionTrigger.PingReq, SwimFailureDetectionState.PingReqed)
                 .OnEntry(entryAction =>
                 {
-                    //  Do the ping-req
                     _stateMachine.Fire(SwimFailureDetectionTrigger.PingReq);
+                    BroadcastPingReq();
                 });
 
             _stateMachine.Configure(SwimFailureDetectionState.PingReqed)
@@ -91,7 +95,7 @@ namespace SwimProtocol
                 .Permit(SwimFailureDetectionTrigger.Reset, SwimFailureDetectionState.Idle)
                 .OnEntryFrom(SwimFailureDetectionTrigger.ProtocolExpireDead, entryAction =>
                 {
-                    HandleDeadNode();
+                    HandleSuspectNode();
                 })
                 .OnEntryFrom(SwimFailureDetectionTrigger.ProtocolExpireLive, entryAction =>
                 {
@@ -104,6 +108,55 @@ namespace SwimProtocol
             AddBootstrapNodes();
         }
 
+        private void BroadcastPingReq()
+        {
+            lock (_nodesLock)
+            {
+                lock (_activeNodeLock)
+                {
+                    //  Select k num of nodes.
+                    RNGCryptoServiceProvider provider = new RNGCryptoServiceProvider();
+                    // Get four random bytes.
+                    byte[] four_bytes = new byte[4];
+                    provider.GetBytes(four_bytes);
+
+                    // Convert that into an uint.
+                    int num = BitConverter.ToInt32(four_bytes, 0);
+
+                    num = num < 0 ? num * -1 : num;
+
+                    int k = 1 + (num % Math.Min(_nodes.Count == 0 ? 1 :_nodes.Count, 8));
+
+                    //  Create list of node candidates, remove active node.
+                    var candidates = _nodes.ToList();
+
+                    candidates.Remove(ActiveNode);
+
+                    //  Shuffle candidates
+                    candidates.Shuffle();
+
+                    //  Select k nodes
+                    var nodesToPingReq = candidates.Take(k);
+
+                    if (!nodesToPingReq.Any())
+                    {
+                        Debug.WriteLine("No nodes to select from");
+                        _logger.LogInformation("No nodes to select from");
+                    }
+
+                    foreach (var node in nodesToPingReq)
+                    {
+                        Debug.WriteLine($"Sending pingreq for {ActiveNode.Endpoint} to {node.Endpoint}");
+                        _logger.LogInformation($"Sending pingreq for {ActiveNode.Endpoint} to {node.Endpoint}");
+
+                        _swimProtocolProvider.SendMessage(node,
+                            new PingReqMessage(ActiveNodeData.PingCorrelationId, ActiveNode,
+                                _swimProtocolProvider.Node));
+                    }
+                }
+            }
+        }
+
         private void RestoreKnownNodes()
         {
             var knownNodes = _nodeRepository.Get();
@@ -113,7 +166,6 @@ namespace SwimProtocol
                 AddNode(knownNode);
             }
         }
-
         private void HandleAliveNode()
         {
             lock (_activeNodeLock)
@@ -129,13 +181,16 @@ namespace SwimProtocol
             }
         }
 
-        private void HandleDeadNode()
+        private void HandleSuspectNode()
         {
             lock (_activeNodeLock)
             {
                 if (ActiveNode == null) return;
 
-                ActiveNode.SetStatus(SwimNodeStatus.Dead);
+                ActiveNode.SetStatus(SwimNodeStatus.Suspicious);
+
+                AddBroadcastMessage(new SuspectMessage(Ulid.NewUlid(), _swimProtocolProvider.Node, ActiveNode));
+
                 _nodeRepository.Upsert(ActiveNode);
             }
         }
@@ -165,6 +220,7 @@ namespace SwimProtocol
 
         public void Start()
         {
+            MarkDeadNodes();
             CleanupDeadNodes();
 
             _protocolTimer.Start();
@@ -181,18 +237,37 @@ namespace SwimProtocol
             _pingTimer.Start();
         }
 
+        private void MarkDeadNodes()
+        {
+            var expiredSuspects = _nodeRepository
+                .Get()
+                .Where(x => x.Status == SwimNodeStatus.Suspicious && (DateTime.UtcNow - x.SuspiciousTimestamp) > new TimeSpan(0, 1, 0))
+                .ToList();
+
+            foreach(var expiredSuspect in expiredSuspects)
+            {
+                _logger.LogInformation($"Marking {expiredSuspect.Endpoint} as DEAD and Broadcasting");
+
+                expiredSuspect.SetStatus(SwimNodeStatus.Dead);
+
+                AddBroadcastMessage(new DeadMessage(Ulid.NewUlid(), _swimProtocolProvider.Node, expiredSuspect));
+
+                _nodeRepository.Upsert(expiredSuspect);
+            }
+        }
+
         private void CleanupDeadNodes()
         {
             var persistedNodes = _nodeRepository
                                     .Get()
-                                    .Where(x => x.Status == SwimNodeStatus.Dead && 
-                                                x.DeadTimestamp.HasValue && 
-                                                (DateTime.UtcNow - x.DeadTimestamp) > new TimeSpan(0, 5, 0))
+                                    .Where(x => x.Status == SwimNodeStatus.Dead)
                                     .ToList();
 
             foreach (var persistedNode in persistedNodes)
             {
-                _nodeRepository.Delete(persistedNode);
+                _logger.LogInformation($"Removing DEAD node {persistedNode.Endpoint} from local list");
+
+                RemoveNode(persistedNode);
             }
         }
 
@@ -200,7 +275,7 @@ namespace SwimProtocol
         {
             lock (_nodesLock)
             {
-                _logger.LogDebug("Shuffling nodes...");
+                _logger.LogInformation("Shuffling nodes...");
 
                 var nodes = new List<ISwimNode>(_nodes.ToArray());
 
@@ -296,25 +371,59 @@ namespace SwimProtocol
             }
         }
 
-        private void AddBroadcastMessage(SignedSwimMessage swimMessage)
+        private bool AddBroadcastMessage(SignedSwimMessage swimMessage)
         {
             lock (_broadcastQueueLock)
             {
                 var item = new BroadcastableItem(swimMessage);
 
-                if (!BroadcastQueue.Contains(item))
-                {
-                    BroadcastQueue.Add(item);
-                }
+                return ApplyMessageOverrides(item);
             }
         }
 
-        //  TODO: Replace older "equivalent" messages?
-        //  IE.   Replace any swimMessage types from the same node talking about an equivalent node.
         private void AddBroadcastMessage(MessageBase message)
         {
             var signedMessage = _swimProtocolProvider.SignMessage(message);
+
             AddBroadcastMessage(signedMessage);
+        }
+
+        private bool ApplyMessageOverrides(BroadcastableItem item)
+        {
+            lock (_broadcastQueueLock)
+            {
+                var items = BroadcastQueue.ToList();
+
+                var toRemove = new List<BroadcastableItem>();
+
+                foreach (var broadcastableItem in items)
+                {
+                    var m = broadcastableItem.SwimMessage.Message;
+
+                    var w = item.SwimMessage.Message.GetMessageOverrideWeight(m);
+
+                    if (w == 0)
+                        continue;
+
+                    if (w == 1)
+                        toRemove.Add(broadcastableItem);
+
+                    if (w == -1)
+                        return false;
+                }
+
+                foreach (var broadcastableItem in toRemove)
+                {
+                    items.Remove(broadcastableItem);
+                }
+
+                items.Add(item);
+
+                BroadcastQueue = new ConcurrentBag<BroadcastableItem>(items
+                    .OrderByDescending(x => x.BroadcastCount));
+            }
+
+            return true;
         }
 
         private IEnumerable<SignedSwimMessage> GetBroadcastMessages(int num = 10)
@@ -362,15 +471,32 @@ namespace SwimProtocol
                         {
                             case MessageType.Alive:
                                 {
-                                    var alive = message as AliveMessage;
-                                    AddNode(alive.SubjectNode);
-                                    AddBroadcastMessage(signedMessage);
+                                    if (AddBroadcastMessage(signedMessage))
+                                    {
+                                        var casted = message as AliveMessage;
+
+                                        if (casted != null)
+                                        {
+                                            _logger.LogInformation(
+                                                $"{signedMessage.Message.SourceNode} marked {casted.SubjectNode} ALIVE");
+                                            AddNode(casted.SubjectNode);
+                                        }
+                                    }
                                 }
                                 break;
                             case MessageType.Dead:
                                 {
-                                    RemoveNode(message.SourceNode);
-                                    AddBroadcastMessage(signedMessage);
+                                    if (AddBroadcastMessage(signedMessage))
+                                    {
+                                        var casted = message as DeadMessage;
+
+                                        if (casted != null)
+                                        {
+                                            _logger.LogInformation(
+                                                $"{signedMessage.Message.SourceNode} marked {casted.SubjectNode} SUSPECT");
+                                            RemoveNode(casted.SubjectNode);
+                                        }
+                                    }
                                 }
                                 break;
                             case MessageType.Ping:
@@ -384,24 +510,31 @@ namespace SwimProtocol
                                     RelayPing(message);
                                 }
                                 break;
+                            case MessageType.Suspect:
+                                {
+                                    if (AddBroadcastMessage(signedMessage))
+                                    {
+                                        var casted = message as SuspectMessage;
+                                        _logger.LogInformation($"{signedMessage.Message.SourceNode} marked {casted.SubjectNode} SUSPECT");
+                                        MarkNodeSuspicious(casted.SubjectNode);
+                                    }
+                                }
+                                break;
                             case MessageType.Ack:
                                 {
                                     HandleAck(message);
                                     AddNode(message.SourceNode);
 
-                                    //AddBroadcastMessage(signedMessage);
+                                    MessageBase ms = null;
 
-                                    //if (swimMessage.CorrelationId.HasValue)
-                                    //{
-                                    //    MessageBase ms = null;
-
-                                    //    //  Send swimMessage back to originating node.
-                                    //    if (CorrelatedMessages.TryRemove(swimMessage.CorrelationId.Value, out ms))
-                                    //    {
-                                    //        var cm = ms as PingReqMessage;
-                                    //        ProtocolProvider.SendMessage(cm.SourceNode, swimMessage);
-                                    //    }
-                                    //}
+                                    //  Send swimMessage back to originating node.
+                                    if (message.CorrelationId.HasValue && CorrelatedMessages.TryRemove(message.CorrelationId.Value, out ms))
+                                    {
+                                        var cm = ms as PingReqMessage;
+                                        _logger.LogInformation(
+                                            $"Relaying ACK {message.SourceNode} -> {cm.SourceNode}");
+                                        _swimProtocolProvider.SendMessage(cm.SourceNode, message);
+                                    }
                                 }
 
                                 break;
@@ -437,8 +570,11 @@ namespace SwimProtocol
 
             if (m.CorrelationId.HasValue)
             {
+                _logger.LogInformation(
+                    $"Relaying PING {m.SourceNode} -> {m.SubjectNode}");
+
                 CorrelatedMessages.TryAdd(m.CorrelationId.Value, m);
-                _swimProtocolProvider.SendMessage(m.Endpoint, new PingMessage(m.CorrelationId.Value) { SourceNode = _swimProtocolProvider.Node });
+                _swimProtocolProvider.SendMessage(m.SubjectNode, new PingMessage(m.CorrelationId.Value) { SourceNode = _swimProtocolProvider.Node });
             }
         }
 
@@ -472,13 +608,26 @@ namespace SwimProtocol
             if (node == null)
                 return;
 
-            //  This is a main reason why we need to lock the nodes collection,
-            //  when nodes die we need to remove them from our queue.
-            //  TODO: Implement a more robust collection.
             lock (_nodesLock)
             {
                 var nodesFiltered = _nodes.Where(x => x.Endpoint != node.Endpoint);
                 _nodes = new ConcurrentQueue<ISwimNode>(nodesFiltered);
+            }
+
+            _nodeRepository.Delete(node);
+        }
+
+        public void MarkNodeSuspicious(ISwimNode node)
+        {
+            lock (_nodesLock)
+            {
+                if (node == null) return;
+
+                var suspiciousNode = _nodes.FirstOrDefault(x => x.Endpoint == node.Endpoint);
+
+                suspiciousNode?.SetStatus(SwimNodeStatus.Suspicious);
+
+                _nodeRepository.Upsert(node);
             }
         }
 
@@ -516,7 +665,10 @@ namespace SwimProtocol
                     }
                 }
 
-                _stateMachine.Fire(SwimFailureDetectionTrigger.Ping);
+                lock (_stateMachineLock)
+                {
+                    _stateMachine.Fire(SwimFailureDetectionTrigger.Ping);
+                }
             }
         }
 
@@ -617,7 +769,6 @@ namespace SwimProtocol
         private class NodeData
         {
             public Ulid PingCorrelationId { get; set; }
-            public Ulid PingReqCorrelationId { get; set; }
             public bool ReceivedAck { get; set; }
         }
     }

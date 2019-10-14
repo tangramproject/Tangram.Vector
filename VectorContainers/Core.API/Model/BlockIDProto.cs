@@ -23,7 +23,7 @@ namespace Core.API.Model
             v.Append(Node.ToString());
             v.Append(" | ");
             v.Append(Round.ToString());
-            if (Hash != "")
+            if (!string.IsNullOrEmpty(Hash))
             {
                 v.Append(" | ");
                 for (int i = 6; i < 12; i++)

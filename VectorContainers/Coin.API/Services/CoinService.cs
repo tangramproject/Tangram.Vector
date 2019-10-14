@@ -1,28 +1,26 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Core.API.Model;
 using Core.API.Helper;
 using Microsoft.Extensions.Logging;
-using Core.API.Onion;
-using System.Net.Http;
+using System.Collections.Generic;
 
 namespace Coin.API.Services
 {
     public class CoinService : ICoinService
     {
-        private readonly IBlockGraphService blockGraphService;
         private readonly IUnitOfWork unitOfWork;
-        private readonly ITorClient torClient;
+        private readonly IBlockGraphService blockGraphService;
+        private readonly IHttpService httpService;
         private readonly ILogger logger;
 
-        public CoinService(IBlockGraphService blockGraphService, IUnitOfWork unitOfWork, ITorClient torClient, ILogger<CoinService> logger)
+        public CoinService(IUnitOfWork unitOfWork, IBlockGraphService blockGraphService, IHttpService httpService, ILogger<CoinService> logger)
         {
-            this.blockGraphService = blockGraphService;
             this.unitOfWork = unitOfWork;
+            this.blockGraphService = blockGraphService;
+            this.httpService = httpService;
             this.logger = logger;
-            this.torClient = torClient;
         }
 
         /// <summary>
@@ -30,59 +28,55 @@ namespace Coin.API.Services
         /// </summary>
         /// <returns>The coin.</returns>
         /// <param name="coin">Coin.</param>
-        public async Task<byte[]> AddCoin(byte[] coin)
+        public async Task<byte[]> AddCoin(CoinProto coin)
         {
             if (coin == null)
                 throw new ArgumentNullException(nameof(coin));
 
             try
             {
-                var coinProto = Util.DeserializeProto<CoinProto>(coin);
-                var coinHasElements = coinProto.Validate().Any();
-
+                var coinHasElements = coin.Validate().Any();
                 if (!coinHasElements)
                 {
-                    var blockId = await unitOfWork.BlockID.Get(coinProto.Stamp.ToStr().FromHex());
-                    if (blockId != null)
-                    {
-                        logger.LogError($"BlockGraphService: BlockID exists");
-                        return null;
-                    }
-
-                    var signedBlockGraph = await blockGraphService.Sign(coinProto, 1);
-                    if (signedBlockGraph == null)
+                    var blockIDExists = await unitOfWork.BlockID.HasCoin(coin.Commitment);
+                    if (blockIDExists)
                     {
                         return null;
                     }
 
-                    var addedBlockGraph = await blockGraphService.AddBlockGraph(signedBlockGraph);
+                    var blockGraphs = await unitOfWork.BlockGraph.GetMany(coin.Stamp, httpService.NodeIdentity);
+                    if (blockGraphs.Any())
+                    {
+                        if (blockGraphs.FirstOrDefault(v => v.Block.SignedBlock.Coin.Version.Equals(coin.Version)) != null)
+                        {
+                            return null;
+                        }
+                    }
+
+                    var blockGraph = new BlockGraphProto
+                    {
+                        Block = new BlockIDProto
+                        {
+                            Node = httpService.NodeIdentity,
+                            Hash = coin.Stamp,
+                            SignedBlock = new BlockProto { Coin = coin, Key = coin.Stamp }
+                        },
+                        Deps = new List<DepProto>()
+                    };
+
+                    var addedBlockGraph = await blockGraphService.AddBlockGraph(blockGraph);
                     if (addedBlockGraph == null)
                     {
                         return null;
                     }
 
-                    Broadcast(coin);
-
-                    var block = Util.SerializeProto(new BlockIDProto
-                    {
-                        Hash = addedBlockGraph.Block.Hash,
-                        Node = addedBlockGraph.Block.Node,
-                        Round = addedBlockGraph.Block.Round,
-                        SignedBlock = new BlockProto
-                        {
-                            Coin = addedBlockGraph.Block.SignedBlock.Coin,
-                            Key = addedBlockGraph.Block.SignedBlock.Key.ToStr().ToBytes(),
-                            PublicKey = addedBlockGraph.Block.SignedBlock.PublicKey.ToHex().ToBytes(),
-                            Signature = addedBlockGraph.Block.SignedBlock.Signature.ToHex().ToBytes()
-                        }
-                    });
-
+                    var block = Util.SerializeProto(addedBlockGraph.Block);
                     return block;
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< CoinService.AddCoin >>>: {ex.ToString()}");
             }
 
             return null;
@@ -92,28 +86,28 @@ namespace Coin.API.Services
         /// Gets the coin.
         /// </summary>
         /// <returns>The coin.</returns>
-        /// <param name="address">Key.</param>
-        public async Task<byte[]> GetCoin(byte[] address)
+        /// <param name="key">Key.</param>
+        public async Task<byte[]> GetCoin(string key)
         {
-            if (address == null)
-                throw new ArgumentNullException(nameof(address));
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
 
-            byte[] blockIdByte = null;
+            byte[] result = null;
 
             try
             {
-                var blockId = await unitOfWork.BlockID.Get(address);
+                var blockId = await unitOfWork.BlockID.Get(key);
                 if (blockId != null)
                 {
-                    blockIdByte = Util.SerializeProto(blockId);
+                    result = Util.SerializeProto(blockId);
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< CoinService.GetCoin >>>: {ex.ToString()}");
             }
 
-            return blockIdByte;
+            return result;
         }
 
         /// <summary>
@@ -122,10 +116,16 @@ namespace Coin.API.Services
         /// <returns>The coins.</returns>
         /// <param name="skip">Skip.</param>
         /// <param name="take">Take.</param>
-        public async Task<byte[]> GetCoins(byte[] key, int skip, int take)
+        public async Task<byte[]> GetCoins(string key, int skip, int take)
         {
-            if (key == null)
+            if (string.IsNullOrEmpty(key))
                 throw new ArgumentNullException(nameof(key));
+
+            if (skip < 0)
+                throw new ArgumentOutOfRangeException(nameof(skip));
+
+            if (take < 0)
+                throw new ArgumentOutOfRangeException(nameof(take));
 
             byte[] result = null;
 
@@ -135,7 +135,39 @@ namespace Coin.API.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< CoinService.GetCoins >>>: {ex.ToString()}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="skip"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
+        public async Task<byte[]> GetCoins(int skip, int take)
+        {
+            if (skip < 0)
+                throw new ArgumentOutOfRangeException(nameof(skip));
+
+            if (take < 0)
+                throw new ArgumentOutOfRangeException(nameof(take));
+
+            byte[] result = null;
+
+            try
+            {
+                var blockIds = await unitOfWork.BlockID.GetRange(skip, take);
+                if (blockIds?.Any() == true)
+                {
+                    result = Util.SerializeProto(blockIds);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< CoinService.GetCoins >>>: {ex.ToString()}");
             }
 
             return result;
@@ -146,16 +178,16 @@ namespace Coin.API.Services
         /// </summary>
         /// <returns>The coins.</returns>
         /// <param name="key">Key.</param>
-        public async Task<byte[]> GetCoins(byte[] key)
+        public async Task<byte[]> GetCoins(string key)
         {
-            if (key == null)
+            if (string.IsNullOrEmpty(key))
                 throw new ArgumentNullException(nameof(key));
 
             byte[] result = null;
 
             try
             {
-                var blockIds = await unitOfWork.BlockID.Search(key);
+                var blockIds = await unitOfWork.BlockID.GetMany(key);
                 if (blockIds?.Any() == true)
                 {
                     result = Util.SerializeProto(blockIds);
@@ -163,31 +195,10 @@ namespace Coin.API.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< CoinService.GetCoins >>>: {ex.ToString()}");
             }
 
             return result;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="coin"></param>
-        private void Broadcast(byte[] coin)
-        {
-            _ = Task.Factory.StartNew(async () =>
-            {
-                var tasks = new List<Task<HttpResponseMessage>>();
-                var endPoints = blockGraphService.Endpoints().Where(x => !x.Equals(blockGraphService.Hostname));
-
-                for (int ep = 0; ep < endPoints.Count(); ep++)
-                {
-                    var uri = new Uri(new Uri(endPoints.ElementAt(ep)), "coin");
-                    tasks.Add(torClient.PostAsJsonAsync(uri, coin));
-                }
-
-                await Task.WhenAll(tasks);
-            });
         }
     }
 }

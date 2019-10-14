@@ -11,6 +11,7 @@ namespace SwimProtocol
         private string _endpoint;
         private SwimNodeStatus _status;
         private DateTime? _deadTimestamp;
+        private DateTime? _suspiciousTimestamp;
         private DateTime? _lastModified;
 
         public SwimNode()
@@ -39,6 +40,11 @@ namespace SwimProtocol
                 DeadTimestamp = DateTime.UtcNow;
             }
 
+            if (status == SwimNodeStatus.Suspicious && Status != SwimNodeStatus.Suspicious && Status != SwimNodeStatus.Dead)
+            {
+                SuspiciousTimestamp = DateTime.UtcNow;
+            }
+
             LastModified = DateTime.UtcNow;
 
             _status = status;
@@ -56,6 +62,13 @@ namespace SwimProtocol
         {
             get { return _deadTimestamp; }
             set { _deadTimestamp = value; }
+        }
+
+        [JsonIgnore]
+        public DateTime? SuspiciousTimestamp
+        {
+            get { return _suspiciousTimestamp; }
+            set { _suspiciousTimestamp = value; }
         }
 
         public SwimNode(string endpoint) => Endpoint = endpoint;

@@ -52,7 +52,7 @@ namespace Core.API.Consensus
             v.Append(" | ");
             v.Append(Round.ToString());
 
-            if (Hash != string.Empty)
+            if (!string.IsNullOrEmpty(Hash))
             {
                 v.Append(" | ");
                 for (int i = 6; i < 12; i++)

@@ -7,5 +7,6 @@ namespace Core.API.Onion
     {
         Task<HiddenServiceDetails> GetHiddenServiceDetailsAsync();
         Task<SignedHashResponse> SignHashAsync(byte[] hash);
+        Task<bool> IsTorStartedAsync();
     }
 }

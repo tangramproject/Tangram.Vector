@@ -14,5 +14,6 @@ namespace SwimProtocol
         void SetStatus(SwimNodeStatus status);
         DateTime? LastModified { get; set; }
         DateTime? DeadTimestamp { get; set; }
+        DateTime? SuspiciousTimestamp { get; set; }
     }
 }

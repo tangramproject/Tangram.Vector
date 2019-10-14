@@ -9,9 +9,11 @@ namespace SwimProtocol
 {
     class PingReqMessage : MessageBase
     {
+        [JsonProperty(PropertyName = "sjn")]
         [JsonConverter(typeof(SwimNodeConverter))]
-        public ISwimNode Endpoint { get; }
+        public ISwimNode SubjectNode { get; set; }
+
         public PingReqMessage() { }
-        public PingReqMessage(Ulid correlationId, ISwimNode node, ISwimNode sourceNode) => (CorrelationId, Endpoint, SourceNode, MessageType) = (correlationId, node, sourceNode, MessageType.PingReq);
+        public PingReqMessage(Ulid correlationId, ISwimNode subjectNode, ISwimNode sourceNode) => (CorrelationId, SubjectNode, SourceNode, MessageType) = (correlationId, subjectNode, sourceNode, MessageType.PingReq);
     }
 }

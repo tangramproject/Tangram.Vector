@@ -1,8 +1,8 @@
 ﻿using System;
 using System.IO;
-using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
 
@@ -24,7 +24,7 @@ namespace MessagePool.API
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                 .Enrich.FromLogContext()
                 .WriteTo.Console()
-                .WriteTo.File("messagepool.api.log")
+                .WriteTo.File("messagepool.api.log", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
             try
@@ -44,10 +44,14 @@ namespace MessagePool.API
             }
         }
 
-        public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
-            WebHost.CreateDefaultBuilder(args)
+        public static IHostBuilder CreateWebHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+            .ConfigureWebHostDefaults(webBuilder =>
+            {
+                webBuilder
                 .UseUrls("http://localhost:6001")
                 .UseStartup<Startup>()
                 .UseSerilog();
+            });
     }
 }

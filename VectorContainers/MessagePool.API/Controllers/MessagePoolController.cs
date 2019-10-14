@@ -1,11 +1,7 @@
 ﻿using System.Net;
 using System.Threading.Tasks;
-using Core.API.Model;
 using MessagePool.API.Services;
 using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
-using System.Text;
-using System;
 
 namespace MessagePool.API.Controllers
 {
@@ -20,33 +16,45 @@ namespace MessagePool.API.Controllers
             this.messagePoolService = messagePoolService;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
         [HttpPost(Name = "AddMessage")]
-        [ProducesResponseType(typeof(bool), (int)HttpStatusCode.OK)]
-        public async Task<IActionResult> AddMessage([FromBody]MessageProto messageProto)
+        [ProducesResponseType(typeof(byte[]), (int)HttpStatusCode.OK)]
+        public async Task<IActionResult> AddMessage([FromBody]byte[] message)
         {
-            messageProto.Address = Encoding.UTF8.GetString(Convert.FromBase64String(messageProto.Address));
-            messageProto.Body = Encoding.UTF8.GetString(Convert.FromBase64String(messageProto.Body));
-
-            var msg = await messagePoolService.AddMessage(messageProto);
-            return Ok(msg);
+            var msg = await messagePoolService.AddMessage(message);
+            return new ObjectResult(new { protobuf = msg });
         }
 
-        [HttpGet("count/{address}", Name = "Count")]
-        [ProducesResponseType(typeof(object), (int)HttpStatusCode.OK)]
-        public async Task<IActionResult> Count(string address)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        [HttpGet("count/{key}", Name = "Count")]
+        [ProducesResponseType(typeof(int), (int)HttpStatusCode.OK)]
+        public async Task<IActionResult> Count(string key)
         {
-            var count = await messagePoolService.Count(address);
-            dynamic dynamic = new { count };
-
-            return Ok(dynamic);
+            var count = await messagePoolService.Count(key);
+            return new ObjectResult(new { count });
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="skip"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
         [HttpGet("messages/{key}/{skip}/{take}", Name = "GetMessagesByKey")]
-        [ProducesResponseType(typeof(List<Message>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(byte[]), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> GetMessagesByKey(string key, int skip, int take)
         {
-            var messages = await messagePoolService.GetMessages(key, skip, take);
-            return Ok(messages);
+            var msgs = await messagePoolService.GetMessages(key, skip, take);
+            return new ObjectResult(new { protobufs = msgs });
         }
     }
 }

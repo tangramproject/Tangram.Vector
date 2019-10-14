@@ -1,12 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Core.API.Model
 {
     public interface IMessageRepository: IRepository<MessageProto>
     {
-    }
-
-    public interface IMessageLinkRepository : IRepository<MessageProtoList>
-    {
+        Task<IEnumerable<MessageProto>> GetMany(string hash);
+        Task<int> Count(string hash);
     }
 }

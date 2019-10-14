@@ -6,6 +6,8 @@ namespace Core.API.Model
     [ProtoContract]
     public class DepProto
     {
+        public string Id { get; set; }
+
         [ProtoMember(1)]
         public BlockIDProto Block = new BlockIDProto();
         [ProtoMember(2)]

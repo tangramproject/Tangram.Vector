@@ -1,19 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Autofac;
-using Autofac.Extensions.DependencyInjection;
 using Core.API.Onion;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Swashbuckle.AspNetCore.Swagger;
 
 namespace Onion.API
 {
@@ -26,46 +18,45 @@ namespace Onion.API
 
         public IConfiguration Configuration { get; }
 
-        public IServiceProvider ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc();
+            services.AddResponseCompression();
+
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+            services.AddMvc(option => option.EnableEndpointRouting = false);
+
+            services.AddControllers();
+
             services.AddSwaggerGen(options =>
             {
-                options.DescribeAllEnumsAsStrings();
-                options.SwaggerDoc("v1", new Info
+                options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
                 {
+                    License = new Microsoft.OpenApi.Models.OpenApiLicense
+                    {
+                        Name = "Attribution-NonCommercial-NoDerivatives 4.0 International",
+                        Url = new Uri("https://raw.githubusercontent.com/tangramproject/Tangram.Vector/initial/LICENSE")
+                    },
                     Title = "Tangram Onion HTTP API",
                     Version = "v1",
                     Description = "Backend services.",
-                    TermsOfService = "https://tangrams.io/legal/",
-                    Contact = new Contact() { Email = "dev@getsneak.org", Url = "https://tangrams.io/about-tangram/team/" }
+                    TermsOfService = new Uri("https://tangrams.io/legal/"),
+                    Contact = new Microsoft.OpenApi.Models.OpenApiContact
+                    {
+                        Email = "dev@getsneak.org",
+                        Url = new Uri("https://tangrams.io/about-tangram/team/")
+                    }
                 });
-            });
-
-            services.AddCors(options =>
-            {
-                options.AddPolicy("CorsPolicy",
-                    builder => builder.AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials());
             });
 
             services.AddHttpContextAccessor();
 
-            RegisterLogger(services);
-
             services.AddOptions();
 
-            services.AddSingleton<IHostedService, TorProcessService>();
-
-            var container = new ContainerBuilder();
-            container.Populate(services);
-
-            return new AutofacServiceProvider(container.Build());
+            services.AddSingleton<ITorProcessService, TorProcessService>();
+            services.AddHostedService<TorProcessService>();
         }
 
-        public void Configure(IApplicationBuilder app, Microsoft.AspNetCore.Hosting.IHostingEnvironment env, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)
         {
             var pathBase = Configuration["PATH_BASE"];
             if (!string.IsNullOrEmpty(pathBase))
@@ -73,10 +64,13 @@ namespace Onion.API
                 app.UsePathBase(pathBase);
             }
 
-            //app.UseHttpsRedirection();
             app.UseStaticFiles();
-            app.UseCors("CorsPolicy");
-            app.UseMvcWithDefaultRoute();
+            app.UseRouting();
+            app.UseCors("default");
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
 
             app.UseSwagger()
                .UseSwaggerUI(c =>
@@ -85,17 +79,6 @@ namespace Onion.API
                    c.OAuthClientId("onionswaggerui");
                    c.OAuthAppName("Onion Swagger UI");
                });
-        }
-
-        private void RegisterLogger(IServiceCollection services)
-        {
-            var logger = new LoggerFactory()
-                            .AddFile("onion.log")
-                            .CreateLogger("onion");
-
-            services.Add(new ServiceDescriptor(typeof(ILogger),
-                                                        provider => logger,
-                                                        ServiceLifetime.Singleton));
         }
     }
 }

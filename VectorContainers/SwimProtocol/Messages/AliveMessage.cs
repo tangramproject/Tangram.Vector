@@ -7,7 +7,7 @@ using System.Text;
 
 namespace SwimProtocol
 {
-    public class AliveMessage : MessageBase
+    public class AliveMessage : MessageBase, IHasSubject
     {
         public AliveMessage() { }
 
@@ -16,5 +16,30 @@ namespace SwimProtocol
         public ISwimNode SubjectNode { get; set; }
 
         public AliveMessage(Ulid correlationId, ISwimNode sourceNode, ISwimNode subjectNode) => (CorrelationId, SourceNode, SubjectNode, MessageType) = (correlationId, sourceNode, subjectNode, MessageType.Alive);
+
+        public override int GetMessageOverrideWeight(MessageBase message)
+        {
+            if (!(message is IHasSubject subject)) return 0;
+
+            var s = subject.SubjectNode;
+
+            if (s.Endpoint != SubjectNode.Endpoint) return 0;
+
+            switch (message.MessageType)
+            {
+                case MessageType.Alive when message.CorrelationId.Value.Time > CorrelationId.Value.Time:
+                    return -1;
+                case MessageType.Alive:
+                    return 1;
+                case MessageType.Suspect when message.CorrelationId.Value.Time >= CorrelationId.Value.Time:
+                    return -1;
+                case MessageType.Suspect:
+                    return 1;
+                case MessageType.Dead:
+                    return -1;
+                default:
+                    return 0;
+            }
+        }
     }
 }

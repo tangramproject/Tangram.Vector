@@ -34,5 +34,20 @@ namespace Core.API.Onion
 
             return JsonConvert.DeserializeObject<SignedHashResponse>(res);
         }
+
+        public async Task<bool> IsTorStartedAsync()
+        {
+            try
+            {
+                var uri = new Uri(new Uri(_configuration.OnionServiceAddress), _configuration.IsTorStartedRoute);
+                var response = await _client.GetStringAsync(uri);
+
+                return JsonConvert.DeserializeObject<bool>(response);
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

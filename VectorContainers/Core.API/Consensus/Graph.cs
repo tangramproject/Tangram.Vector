@@ -397,7 +397,9 @@ namespace Core.API.Consensus
                     {
                         return null;
                     }
-                    var b = s.GetBitSet(NodeCount, m);
+                    ulong size = sender > receiver ? sender : receiver;
+                    // var b = s.GetBitSet(NodeCount, m);
+                    var b = s.GetBitSet((int)size, m);
                     b.SetPrepare(sender);
                     b.SetPrepare(receiver);
                     if (s.Data == null)
@@ -416,11 +418,13 @@ namespace Core.API.Consensus
                     }
                     if (v < m.View)
                     {
-                        b = s.GetBitSet(NodeCount, m.Pre());
+                        // b = s.GetBitSet(NodeCount, m.Pre());
+                        b = s.GetBitSet((int)sender, m.Pre());
                         b.SetPrepare(m.Sender);
                         return null;
                     }
-                    b = s.GetBitSet(NodeCount, m.Pre());
+                    // b = s.GetBitSet(NodeCount, m.Pre());
+                    b = s.GetBitSet((int)sender, m.Pre());
                     b.SetPrepare(m.Sender);
 
                     Debug.WriteLine($"Prepare count == {b.PrepareCount()}");
@@ -452,7 +456,8 @@ namespace Core.API.Consensus
                     {
                         return null;
                     }
-                    b = s.GetBitSet(NodeCount, m.Pre());
+                    // b = s.GetBitSet(NodeCount, m.Pre());
+                    b = s.GetBitSet((int)sender, m.Pre()); 
                     b.SetCommit(m.Sender);
 
                     Debug.WriteLine($"Commit count == {b.CommitCount()}");
@@ -692,10 +697,12 @@ namespace Core.API.Consensus
         {
             Debug.WriteLine($"Adding block to graph block.id={data.Block}");
 
-            _ = Task.Factory.StartNew(async () =>
+            var task = Task.Factory.StartNew(async () =>
             {
                 await Entries.Writer.WriteAsync(data);
             });
+
+            task.Wait();
         }
     }
 }

@@ -1,194 +1,201 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
+using Coin.API.Providers;
 using Core.API.Consensus;
 using Core.API.Helper;
 using Core.API.LibSodium;
-using Core.API.Membership;
 using Core.API.Model;
 using Core.API.Onion;
 using Core.API.Signatures;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using Secp256k1_ZKP.Net;
 
 namespace Coin.API.Services
 {
     public class BlockGraphService : IBlockGraphService
     {
+        private const int processBlocksInterval = 1 * 60 * 32;
+        private const int requiredNodeCount = 4;
+
         private static readonly AsyncLock processBlocksMutex = new AsyncLock();
+        private static readonly AsyncLock interpretBlocksMutex = new AsyncLock();
+        private static readonly AsyncLock addBlockGraphMutex = new AsyncLock();
+
+        private Graph Graph;
+        private Config Config;
 
         private readonly IUnitOfWork unitOfWork;
-        private readonly IMembershipServiceClient membershipServiceClient;
-        private readonly IOnionServiceClient onionServiceClient;
-        private readonly ILogger logger;
+        private readonly IHttpService httpService;
         private readonly ITorClient torClient;
-        private readonly System.Timers.Timer processBlocksTimer;
-        private readonly System.Timers.Timer replayTimer;
+        private readonly ILogger logger;
 
-        public string Hostname { get; }
-        public Graph Graph { get; }
-        public Config Config { get; }
+        private readonly HierarchicalDataProvider dataProvider;
+        private readonly SigningProvider signingProvider;
 
-        public BlockGraphService(IUnitOfWork unitOfWork, IMembershipServiceClient membershipServiceClient, IOnionServiceClient onionServiceClient, ILogger<BlockGraphService> logger, ITorClient torClient)
+        private Timer processBlocksTimer;
+        private ulong lastInterpreted;
+        private ulong round;
+
+        public BlockGraphService(IUnitOfWork unitOfWork, IHttpService httpService, HierarchicalDataProvider dataProvider, SigningProvider signingProvider,
+            ITorClient torClient, ILogger<BlockGraphService> logger)
         {
             this.unitOfWork = unitOfWork;
-            this.membershipServiceClient = membershipServiceClient;
-            this.onionServiceClient = onionServiceClient;
-            this.logger = logger;
+            this.httpService = httpService;
+            this.dataProvider = dataProvider;
+            this.signingProvider = signingProvider;
             this.torClient = torClient;
+            this.logger = logger;
 
-            Hostname = GetHostName();
-            Config = new Config(new ulong[Endpoints().Count()], HostNameToInt64(Hostname.ToBytes()));
-            Graph = new Graph(Config, BlockmaniaCallback);
-            //processBlocksTimer = new System.Timers.Timer
-            //{
-            //    Interval = 3000
-            //};
-            replayTimer = new System.Timers.Timer
-            {
-                Interval = 5000
-            };
-
-            //processBlocksTimer.Elapsed += (s, e) => ProcessBlocks(s, e).SwallowException();
-            //processBlocksTimer.Start();
-
-            replayTimer.Elapsed += (s, e) => Replay(s, e).SwallowException();
-            replayTimer.Start();
+            Start().GetAwaiter();
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="blockGraphProto"></param>
-        /// <returns></returns>
-        public async Task<BlockGraphProto> AddBlockGraph(BlockGraphProto blockGraphProto)
+        private async Task Start()
         {
-            if (blockGraphProto == null)
-                throw new ArgumentNullException(nameof(blockGraphProto));
+            logger.LogInformation("<<< Initialize >>>: Starting Block Graph Service.");
 
-            try
+            var totalNodes = httpService.Members.Count + 1;
+            if (totalNodes < requiredNodeCount)
             {
-                var key = blockGraphProto.Block.SignedBlock.Key;
+                logger.LogWarning($"<<< Initialize >>>: Minimum number of nodes required (4). Total number of nodes ({totalNodes})");
+            }
 
-                var blockId = await unitOfWork.BlockID.Get(key);
-                if (blockId != null)
+            lastInterpreted = await unitOfWork.Interpreted.GetRound();
+            lastInterpreted = lastInterpreted > 0 ? lastInterpreted - 1 : lastInterpreted;
+
+            round = lastInterpreted;
+
+            Config = new Config(lastInterpreted, new ulong[totalNodes], httpService.NodeIdentity, (ulong)totalNodes);
+            Graph = new Graph(Config, BlockmaniaCallback);
+
+            processBlocksTimer = new Timer((state) => ProcessBlocks().SwallowException(), null, processBlocksInterval, System.Threading.Timeout.Infinite);
+
+            logger.LogInformation("<<< Initialize >>>: Started Block Graph Service.");
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="blockGraph"></param>
+        /// <returns></returns>
+        public async Task<BlockGraphProto> AddBlockGraph(BlockGraphProto blockGraph)
+        {
+            if (blockGraph == null)
+                throw new ArgumentNullException(nameof(blockGraph));
+
+            using (await addBlockGraphMutex.LockAsync())
+            {
+                try
                 {
-                    logger.LogError($"BlockGraphService: BlockID exists");
-                    return null;
-                }
-
-                var blockGraphs = await unitOfWork.MemPool.GetMultiple(key);
-                if (blockGraphs == null)
-                {
-                    if (!blockGraphProto.Block.Node.Equals(Graph.Self))
+                    if (blockGraph.Block.Node.Equals(httpService.NodeIdentity))
                     {
-                        return await BlockIdNotIncluded(blockGraphProto);
-                    }
-
-                    var added = await unitOfWork.MemPool.PutMultiple(key, new List<BlockGraphProto> { blockGraphProto });
-                    if (added == false)
-                    {
-                        logger.LogError($"BlockGraphService: Failed to add block graph proto to mem pool");
-                        return null;
-                    }
-
-                    return blockGraphProto;
-                }
-
-                if (blockGraphs != null)
-                {
-                    if (blockGraphProto.Block.Node.Equals(Graph.Self))
-                    {
-                        blockGraphProto.Prev = blockGraphs.Last().Block;
-
-                        var list = blockGraphs.ToList();
-                        list.Add(blockGraphProto);
-
-                        var added = await unitOfWork.MemPool.PutMultiple(key, list.AsEnumerable());
-                        if (added == false)
+                        var self = await AddToSelf(blockGraph);
+                        if (self == null)
                         {
-                            logger.LogError($"BlockGraphService: Failed to add block graph proto to mem pool");
+                            logger.LogError($"<<< AddBlockGraph >>>: Could not add self graph to mem pool for block {blockGraph.Block.Round} from node {blockGraph.Block.Node}");
                             return null;
                         }
 
-                        //return memBlockGraph;
+                        return self;
                     }
+
+                    var isSelf = await AddToSelf(blockGraph);
+                    if (isSelf == null)
+                    {
+                        logger.LogError($"<<< AddBlockGraph >>>: Exists or could not add self graph to mem pool for block {blockGraph.Block.Round} from node {blockGraph.Block.Node}");
+                        return null;
+                    }
+
+                    var stored = await Store(blockGraph);
+                    if (stored == null)
+                    {
+                        logger.LogError($"<<< AddBlockGraph >>>: Could not store graph to mem pool for block {blockGraph.Block.Round} from node {blockGraph.Block.Node}");
+                        return null;
+                    }
+
+                    return stored;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"<<< BlockGraphService.AddBlockGraph >>>: {ex.ToString()}");
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="blockGraph"></param>
+        /// <returns></returns>
+        private async Task<BlockGraphProto> AddToSelf(BlockGraphProto blockGraph)
+        {
+            if (blockGraph == null)
+                throw new ArgumentNullException(nameof(blockGraph));
+
+            BlockGraphProto stored = null;
+
+            try
+            {
+                var can = await CanAdd(blockGraph, httpService.NodeIdentity);
+                if (can == null)
+                {
+                    return blockGraph;
                 }
 
-                //if (!blockGraphProto.Block.Node.Equals(Graph.Self))
-                //{
-                //    if (memBlockGraph.Deps?.Any() != true)
-                //    {
-                //        memBlockGraph.Deps = new List<DepProto>();
-                //    }
+                round += 1;
 
-                //    memBlockGraph.Deps.Add(
-                //        new DepProto
-                //        {
-                //            Block = blockGraphProto.Block,
-                //            Deps = blockGraphProto.Deps.Select(d => d.Block).ToList(),
-                //            Prev = blockGraphProto.Prev ?? null
-                //        });
+                var signed = await signingProvider.Sign(httpService.NodeIdentity, blockGraph, round, await httpService.GetPublicKey());
+                var prev = await unitOfWork.BlockGraph.GetPrevious(httpService.NodeIdentity, round);
 
-                //    var addedMemBlockGraph = await unitOfWork.MemPool.Put(key, memBlockGraph);
-                //    if (addedMemBlockGraph == false)
-                //    {
-                //        logger.LogError($"BlockGraphService: Failed to add block graph proto to mem pool");
-                //        return null;
-                //    }
+                signed.Prev = prev?.Block;
 
-                //    return memBlockGraph;
-                //}
+                stored = await Store(signed);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< BlockGraphService.AddToSelf >>>: {ex.ToString()}");
             }
 
-           return blockGraphProto;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="address"></param>
-        /// <returns></returns>
-        public async Task<BlockIDProto> GetBlockID(byte[] address)
-        {
-            BlockIDProto blockId = null;
-
-            try
-            {
-                blockId = await unitOfWork.BlockID.Get(address);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-            }
-
-            return blockId;
+            return stored;
         }
 
         /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>
-        public async Task<List<BlockIDProto>> AllBlockIDs()
+        public async Task<long> NetworkBlockHeight()
         {
-            List<BlockIDProto> blockIds = null;
+            long height = 0;
+            List<long> list = new List<long>();
 
             try
             {
-                blockIds = await unitOfWork.BlockID.All();
+                var responses = await httpService.Dial(DialType.Get, "height");
+                foreach (var response in responses)
+                {
+                    var jToken = Util.ReadJToken(response, "height");
+                    list.Add(jToken.Value<long>());
+                }
+
+                if (list.Any())
+                {
+                    height = list.Max();
+                }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< BlockGraphService.NetworkBlockHeight >>>: {ex.ToString()}");
             }
 
-            return blockIds;
+            return height;
         }
 
         /// <summary>
@@ -202,72 +209,25 @@ namespace Coin.API.Services
                 throw new ArgumentNullException(nameof(coin));
 
             var coinHasElements = coin.Validate().Any();
-
             if (!coinHasElements)
             {
                 try
                 {
-                    using (var secp256k1 = new Secp256k1())
-                    using (var bulletProof = new BulletProof())
-                    {
-                        var success = bulletProof.Verify(coin.Commitment, coin.RangeProof, null);
-                        if (!success)
-                            return false;
-                    }
+                    using var secp256k1 = new Secp256k1();
+                    using var bulletProof = new BulletProof();
+
+                    var success = bulletProof.Verify(coin.Commitment.FromHex(), coin.RangeProof.FromHex(), null);
+                    if (!success)
+                        return false;
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex.Message);
+                    logger.LogError($"<<< BlockGraphService.ValidateRule >>>: {ex.ToString()}");
                     return false;
                 }
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="coin"></param>
-        /// <returns></returns>
-        public async Task<BlockGraphProto> Sign(CoinProto coin, uint round)
-        {
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
-
-            if (round == 0)
-                throw new ArgumentOutOfRangeException(nameof(round));
-
-            try
-            {
-                var blockHash = BlockHash(coin, round, GetPublicKey());
-                var coinHash = HashCoin(coin, GetPublicKey());
-                var combinedHash = Util.Combine(blockHash, coinHash);
-                var signedHash = await onionServiceClient.SignHashAsync(combinedHash);
-
-                return new BlockGraphProto
-                {
-                    Block = new BlockIDProto
-                    {
-                        Hash = coin.Stamp.ToStr(),
-                        Node = Graph.Self,
-                        Round = round,
-                        SignedBlock = new BlockProto
-                        {
-                            Key = coin.Stamp,
-                            Coin = coin,
-                            PublicKey = signedHash.PublicKey,
-                            Signature = signedHash.Signature
-                        }
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-            }
-
-            return null;
         }
 
         /// <summary>
@@ -285,15 +245,15 @@ namespace Coin.API.Services
             try
             {
                 var signedBlock = blockIDProto.SignedBlock;
-                var blockHash = BlockHash(signedBlock.Coin, (uint)blockIDProto.Round, signedBlock.PublicKey);
-                var coinHash = HashCoin(signedBlock.Coin, signedBlock.PublicKey);
+                var blockHash = signingProvider.BlockHash(signedBlock.Coin, (uint)blockIDProto.Node, (uint)blockIDProto.Round, signedBlock.PublicKey);
+                var coinHash = signingProvider.HashCoin(signedBlock.Coin, signedBlock.PublicKey);
                 var combinedHash = Util.Combine(blockHash, coinHash);
 
-                result = Ed25519.Verify(signedBlock.Signature, combinedHash, signedBlock.PublicKey);
+                result = Ed25519.Verify(signedBlock.Signature.FromHex(), combinedHash, signedBlock.PublicKey.FromHex());
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< BlockGraphService.VerifiySignature >>>: {ex.ToString()}");
             }
 
             return result;
@@ -317,15 +277,15 @@ namespace Coin.API.Services
 
             try
             {
-                var hint = Cryptography.GenericHashNoKey($"{next.Version} {next.Stamp.ToStr()} {next.Principle.ToStr()}").ToHex();
-                var keeper = Cryptography.GenericHashNoKey($"{next.Version} {next.Stamp.ToStr()} {next.Hint.ToStr()}").ToHex();
+                var hint = Cryptography.GenericHashNoKey($"{next.Version} {next.Stamp} {next.Principle}").ToHex();
+                var keeper = Cryptography.GenericHashNoKey($"{next.Version} {next.Stamp} {next.Hint}").ToHex();
 
-                validH = previous.Hint.ToStr().Equals(hint);
-                validK = previous.Keeper.ToStr().Equals(keeper);
+                validH = previous.Hint.Equals(hint);
+                validK = previous.Keeper.Equals(keeper);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< BlockGraphService.VerifiyHashChain >>>: {ex.ToString()}");
             }
 
             return validH && validK;
@@ -335,97 +295,17 @@ namespace Coin.API.Services
         /// 
         /// </summary>
         /// <returns></returns>
-        public async Task<BlockIDProto> GetPrevBlockID(byte[] address)
+        public async Task<int> BlockHeight()
         {
-            if (address == null)
-                throw new ArgumentNullException(nameof(address));
-
-            BlockIDProto blockIDProto = null;
+            int blockHeight = 0;
 
             try
             {
-                var blockIDs = await unitOfWork.BlockID.Search(address);
-                if (blockIDs != null)
-                {
-                    if (blockIDs.LastOrDefault().SignedBlock != null)
-                    {
-                        var isVerified = VerifiySignature(blockIDs.LastOrDefault());
-                        if (!isVerified)
-                        {
-                            return null;
-                        }
-                    }
-                }
-
-                blockIDProto = blockIDs.LastOrDefault();
+                blockHeight = await unitOfWork.BlockID.Count(httpService.NodeIdentity);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
-            }
-
-            return blockIDProto;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="blockGraphProtos"></param>
-        public void Broadcast(IEnumerable<BlockGraphProto> blockGraphProtos)
-        {
-            if (blockGraphProtos?.Any() != true)
-                throw new ArgumentNullException(nameof(blockGraphProtos));
-
-            _ = Task.Factory.StartNew(async () =>
-            {
-                try
-                {
-                    var tasks = new List<Task<HttpResponseMessage>>();
-                    var batchSize = 100;
-                    var numberOfBatches = (int)Math.Ceiling((double)blockGraphProtos.Count() / batchSize);
-                    var endPoints = Endpoints().Where(x => !x.Equals(Hostname));
-
-                    for (int ep = 0; ep < endPoints.Count(); ep++)
-                    {
-                        var uri = new Uri(new Uri(endPoints.ElementAt(ep)), "blockgraph");
-
-                        for (int n = 0; n < numberOfBatches; n++)
-                        {
-                            var currentBlockGraphs = Util.SerializeProto(blockGraphProtos.Skip(n * batchSize).Take(batchSize));
-                            tasks.Add(torClient.PostAsJsonAsync(uri, currentBlockGraphs));
-                        }
-                    }
-
-                    await Task.WhenAll(tasks);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            });
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerable<string> Endpoints() => membershipServiceClient.GetMembers().Select(x => x.Endpoint);
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public long BlockHeight()
-        {
-            long blockHeight = 0;
-
-            try
-            {
-                blockHeight = unitOfWork.BlockID.Count();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< BlockGraphService.BlockHeight >>>: {ex.ToString()}");
             }
 
             return blockHeight;
@@ -434,273 +314,213 @@ namespace Coin.API.Services
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="coin"></param>
-        /// <param name="round"></param>
-        /// <param name="publicKey"></param>
+        /// <param name="blocks"></param>
         /// <returns></returns>
-        private byte[] BlockHash(CoinProto coin, uint round, byte[] publicKey)
+        public async Task<bool> InterpretBlocks(IEnumerable<BlockID> blocks)
         {
-            return Cryptography.GenericHashWithKey($"{coin.Stamp.ToStr()}{Graph.Self}{round}", publicKey);
-        }
+            if (blocks == null)
+                throw new ArgumentNullException(nameof(blocks));
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="coin"></param>
-        /// <param name="key"></param>
-        /// <returns></returns>
-        private byte[] HashCoin(CoinProto coin, byte[] key = null)
-        {
-            var serialized = Util.SerializeProto(coin);
-            var hash = key == null ? Cryptography.GenericHashNoKey(serialized) : Cryptography.GenericHashWithKey(serialized, key);
-
-            return hash;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        private async Task Replay(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            replayTimer.Stop();
-
-            try
+            using (await interpretBlocksMutex.LockAsync())
             {
-                var rangeBlockGraphTasks = new List<Task<IEnumerable<IEnumerable<BlockGraphProto>>>>();
-                var addSignedBlockGraphTasks = new List<Task<BlockGraphProto>>();
-                var batchSize = 100;
-                var numberOfBatches = (int)Math.Ceiling((double)unitOfWork.MemPool.Count() / batchSize);
-
-                for (int n = 0; n < numberOfBatches; n++)
-                    rangeBlockGraphTasks.Add(unitOfWork.MemPool.GetRangeMultiple(n * batchSize, batchSize));
-
-                var replayList = new List<BlockGraphProto>();
-
-                var graphs = (await Task.WhenAll(rangeBlockGraphTasks)).SelectMany(x => x).Select(x => x.Where(c => c.Block.Node.Equals(Graph.Self)));
-
-                graphs.ForEach(ghs =>
+                foreach (var block in blocks)
                 {
-                    ghs.ForEach(x => {
-
-                        var round = x.Block.Round++;
-                        var signedBlockGraph = Sign(x.Block.SignedBlock.Coin, (uint)round).GetAwaiter().GetResult();
-                        if (signedBlockGraph == null)
-                        {
-                            logger.LogError($"BlockGraphService: Could not sign Replay block");
-                            return;
-                        }
-
-                        //signedBlockGraph.Prev = x.Prev ?? null;
-
-                        addSignedBlockGraphTasks.Add(AddBlockGraph(signedBlockGraph));
-
-                        replayList.Add(signedBlockGraph);
-                    });
-                });
-
-                Broadcast(replayList);
-
-                await Task.WhenAll(addSignedBlockGraphTasks);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-            }
-
-            replayTimer.Start();
-
-            return;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="blockGraphProto"></param>
-        /// <returns></returns>
-        private async Task<BlockGraphProto> BlockIdNotIncluded(BlockGraphProto blockGraphProto)
-        {
-            if (blockGraphProto == null)
-                throw new ArgumentNullException(nameof(blockGraphProto));
-
-            try
-            {
-                var key = blockGraphProto.Block.SignedBlock.Key;
-                var notIncluded = await unitOfWork.MemPool.Get(key);
-
-                if (notIncluded == null)
-                {
-                    //var coinProto = Util.DeserializeProto<CoinProto>(blockGraphProto.Block.SignedBlock.Coin);
-                    var signedBlockGraph = await Sign(blockGraphProto.Block.SignedBlock.Coin, 1);
-                    if (signedBlockGraph == null)
+                    var coinExists = await unitOfWork.BlockID.HasCoin(block.SignedBlock.Coin.Commitment);
+                    if (coinExists)
                     {
-                        logger.LogError($"BlockGraphService: Could not sign NotInclueded block");
-                        return null;
+                        logger.LogWarning($"<<< BlockGraphService.InterpretBlocks >>>: Coin exists for block {block.Round} from node {block.Node}");
+                        continue;
                     }
 
-                    if (blockGraphProto.Deps?.Any() != true)
+                    var blockIdProto = new BlockIDProto { Hash = block.Hash, Node = block.Node, Round = block.Round, SignedBlock = block.SignedBlock };
+                    if (!VerifiySignature(blockIdProto))
                     {
-                        signedBlockGraph.Deps = new List<DepProto>
-                    {
-                        new DepProto
-                        {
-                            Block = blockGraphProto.Block,
-                            Prev = blockGraphProto.Prev ?? null
-                        }
-                    };
+                        logger.LogError($"<<< BlockGraphService.InterpretBlocks >>>: unable to verify signature for block {block.Round} from node {block.Node}");
+                        continue;
                     }
-                    else
+
+                    var coinRule = ValidateRule(blockIdProto.SignedBlock.Coin);
+                    if (!coinRule)
                     {
-                        signedBlockGraph.Deps.Add(
-                            new DepProto
+                        logger.LogError($"<<< BlockGraphService.InterpretBlocks >>>: unable to validate coin rule for block {block.Round} from node {block.Node}");
+                        continue;
+                    }
+
+                    var coins = await GetCoins(blockIdProto.SignedBlock.Coin.Stamp);
+                    if (coins?.Any() == true)
+                    {
+                        var list = coins.ToList();
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            CoinProto previous;
+                            CoinProto next;
+
+                            try
                             {
-                                Block = blockGraphProto.Block,
-                                Deps = blockGraphProto.Deps.Select(d => d.Block).ToList(),
-                                Prev = blockGraphProto.Prev ?? null
-                            });
+                                previous = list[(i - 1) % (list.Count - 1)].SignedBlock.Coin;
+                            }
+                            catch (DivideByZeroException)
+                            {
+                                previous = list[i].SignedBlock.Coin;
+                            }
+
+                            var previousRule = ValidateRule(previous);
+                            if (!previousRule)
+                            {
+                                logger.LogError($"<<< BlockGraphService.InterpretBlocks >>>: unable to validate coin rule for block {block.Round} from node {block.Node}");
+                                return false;
+                            }
+
+                            try
+                            {
+                                next = list[(i + 1) % (list.Count - 1)].SignedBlock.Coin;
+
+                                var nextRule = ValidateRule(next);
+                                if (!nextRule)
+                                {
+                                    logger.LogError($"<<< BlockGraphService.InterpretBlocks >>>: unable to validate coin rule for block {block.Round} from node {block.Node}");
+                                    return false;
+                                }
+                            }
+                            catch (DivideByZeroException)
+                            {
+                                next = blockIdProto.SignedBlock.Coin;
+                            }
+
+                            if (!VerifiyHashChain(previous, next))
+                            {
+                                logger.LogError($"<<< BlockGraphService.InterpretBlocks >>>: Could not verify hash chain for Interpreted BlockID");
+                                return false;
+                            }
+                        }
+
+                        using var pedersen = new Pedersen();
+
+                        var sum = coins.Select(c => c.SignedBlock.Coin.Commitment.FromHex());
+                        var success = pedersen.VerifyCommitSum(new List<byte[]> { sum.First() }, sum.Skip(1));
+                        if (!success)
+                        {
+                            logger.LogError($"<<< BlockGraphService.InterpretBlocks >>>: Could not verify committed sum for Interpreted BlockID");
+                            return false;
+                        }
                     }
 
-                    var addedNotIncluded = await unitOfWork.MemPool.Put(key, signedBlockGraph);
-                    if (addedNotIncluded == false)
+                    var blockId = await unitOfWork.BlockID.StoreOrUpdate(blockIdProto);
+                    if (blockId == null)
                     {
-                        logger.LogError($"BlockGraphService: Could not add NotInclueded block");
-                        return null;
+                        logger.LogError($"<<< BlockGraphService.InterpretBlocks >>>: Could not save block for {blockIdProto.Node} and round {blockIdProto.Round}");
+                        return false;
                     }
-
-                    return signedBlockGraph;
                 }
             }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="blockGraph"></param>
+        /// <returns></returns>
+        private async Task<BlockGraphProto> Store(BlockGraphProto blockGraph)
+        {
+            if (blockGraph == null)
+                throw new ArgumentNullException(nameof(blockGraph));
+
+            BlockGraphProto stored = null;
+
+            try
+            {
+                var can = await CanAdd(blockGraph, blockGraph.Block.Node);
+                if (can == null)
+                {
+                    return blockGraph;
+                }
+
+                stored = await unitOfWork.BlockGraph.StoreOrUpdate(new BlockGraphProto
+                {
+                    Block = blockGraph.Block,
+                    Deps = blockGraph.Deps?.Select(d => d).ToList(),
+                    Prev = blockGraph.Prev ?? null,
+                    Included = blockGraph.Included,
+                    Replied = blockGraph.Replied
+                });
+            }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"<<< BlockGraphService.Store >>>: {ex.ToString()}");
             }
 
-            return blockGraphProto;
+            return stored;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="hostname"></param>
+        /// <param name="blockGraph"></param>
         /// <returns></returns>
-        private ulong HostNameToInt64(byte[] hostname) => (ulong)BitConverter.ToInt64(hostname, 0);
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        private string GetHostName()
+        private async Task<BlockGraphProto> CanAdd(BlockGraphProto blockGraph, ulong node)
         {
-            var hostname = onionServiceClient.GetHiddenServiceDetailsAsync().Result.Hostname;
-            return hostname.Substring(0, hostname.Length - 6);
+            var blockGraphs = await unitOfWork.BlockGraph.GetMany(blockGraph.Block.Hash, node);
+            if (blockGraphs.Any())
+            {
+                var graph = blockGraphs.FirstOrDefault(x => x.Block.Round.Equals(blockGraph.Block.Round));
+                if (graph != null)
+                {
+                    logger.LogWarning($"<<< BlockGraphService.CanAdd >>>: Block exists for node {graph.Block.Node} and round {graph.Block.Round}");
+                    return null;
+                }
+            }
+
+            return blockGraph;
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        private byte[] GetPublicKey()
-        {
-            var pubKey = onionServiceClient.GetHiddenServiceDetailsAsync().Result.PublicKey;
-            return pubKey;
-        }
         /// <summary>
         /// 
         /// </summary>
         /// <param name="interpreted"></param>
         private void BlockmaniaCallback(Interpreted interpreted)
         {
-            Console.WriteLine($"Interpreted round is {interpreted.Round}");
+            if (interpreted == null)
+                throw new ArgumentNullException(nameof(interpreted));
+
+            unitOfWork.Interpreted.Store(interpreted.Consumed, interpreted.Round);
 
             _ = Task.Factory.StartNew(async () =>
             {
                 try
                 {
-                    var blocks = interpreted.Blocks.GroupBy(x => x.Hash).Select(x => x.First());
-                    foreach (var block in blocks)
+                    var interpretedList = new List<BlockID>();
+
+                    foreach (var block in interpreted.Blocks)
                     {
-                        var blockId = await unitOfWork.BlockID.Get(block.SignedBlock.Key);
-                        if (blockId != null)
+                        var blockGraphs = await unitOfWork.BlockGraph.GetMany(block.Hash, httpService.NodeIdentity);
+                        if (blockGraphs.Any() != true)
                         {
-                            logger.LogError($"BlockGraphService: BlockID exists");
+                            logger.LogWarning($"<<< BlockGraphService.BlockmaniaCallback >>>: Unable to find blocks with - Hash: {block.Hash} Round: {block.Round} from node {block.Node}");
                             continue;
                         }
 
-                        var blockIdProto = new BlockIDProto { Hash = block.Hash, Node = block.Node, Round = block.Round, SignedBlock = block.SignedBlock };
-                        if (!VerifiySignature(blockIdProto))
+                        var blockGraph = blockGraphs.FirstOrDefault(x => x.Block.Node.Equals(httpService.NodeIdentity) && x.Block.Round.Equals(block.Round));
+                        if (blockGraph == null)
                         {
-                            logger.LogError($"BlockGraphService: unable to verify signature for block {block.Round} from node {block.Node}");
+                            logger.LogError($"<<< BlockGraphService.BlockmaniaCallback >>>: Unable to find matching block - Hash: {block.Hash} Round: {block.Round} from node {block.Node}");
                             continue;
                         }
 
-                        //var coinProto = Util.DeserializeProto<CoinProto>(blockIdProto.SignedBlock.Coin);
-                        var coinRule = ValidateRule(blockIdProto.SignedBlock.Coin);
-                        if (!coinRule)
-                        {
-                            logger.LogError($"BlockGraphService: unable to validate coin rule for block {block.Round} from node {block.Node}");
-                            continue;
-                        }
+                        interpretedList.Add(new BlockID(blockGraph.Block.Hash, blockGraph.Block.Node, blockGraph.Block.Round, blockGraph.Block.SignedBlock));
+                    }
 
-                        var coins = await unitOfWork.BlockID.Search(blockIdProto.SignedBlock.Key);
-                        if (coins?.Any() == true)
-                        {
-                            var list = coins.ToList();
-                            for (int i = 0; i < list.Count; i++)
-                            {
-                                CoinProto previous;
-                                CoinProto next;
-
-                                try
-                                {
-                                    previous = list[(i - 1) % (list.Count - 1)].SignedBlock.Coin; // Util.DeserializeProto<CoinProto>(list[(i - 1) % (list.Count - 1)].SignedBlock.Coin);
-                                }
-                                catch (DivideByZeroException)
-                                {
-                                    previous = list[i].SignedBlock.Coin; // Util.DeserializeProto<CoinProto>(list[i].SignedBlock.Coin);
-                                }
-
-                                var previousRule = ValidateRule(previous);
-                                if (!previousRule)
-                                {
-                                    logger.LogError($"BlockGraphService: unable to validate coin rule for block {block.Round} from node {block.Node}");
-                                    return;
-                                }
-
-                                try
-                                {
-                                    next = list[(i + 1) % (list.Count - 1)].SignedBlock.Coin; // Util.DeserializeProto<CoinProto>(list[(i + 1) % (list.Count - 1)].SignedBlock.Coin);
-
-                                    var nextRule = ValidateRule(next);
-                                    if (!nextRule)
-                                    {
-                                        logger.LogError($"BlockGraphService: unable to validate coin rule for block {block.Round} from node {block.Node}");
-                                        return;
-                                    }
-                                }
-                                catch (DivideByZeroException)
-                                {
-                                    next = blockIdProto.SignedBlock.Coin; // coinProto;
-                                }
-
-                                if (!VerifiyHashChain(previous, next))
-                                {
-                                    logger.LogError($"BlockGraphService: Could not verifiy hash chain for Interpreted BlockID");
-                                    return;
-                                }
-                            }
-                        }
-
-                        var addedBlockId = await unitOfWork.BlockID.Put(blockIdProto.SignedBlock.Key, blockIdProto);
-                        if (addedBlockId == false)
-                        {
-                            logger.LogError($"BlockGraphService: Could not add Interpreted BlockID");
-                            continue;
-                        }
+                    // Should return success blocks instead of bool.
+                    var success = await InterpretBlocks(interpretedList);
+                    if (success)
+                    {
+                        await dataProvider.MarkAs(interpretedList, JobState.Polished);
                     }
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex.Message);
+                    logger.LogError($"<<< BlockGraphService.BlockmaniaCallback >>>: {ex.ToString()}");
                 }
             });
         }
@@ -708,50 +528,67 @@ namespace Coin.API.Services
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private async Task ProcessBlocks(object sender, System.Timers.ElapsedEventArgs e)
+        /// <param name="hash"></param>
+        /// <returns></returns>
+        private Task<IEnumerable<BlockIDProto>> GetCoins(string hash)
         {
-            processBlocksTimer.Stop();
+            if (string.IsNullOrEmpty(hash))
+                throw new ArgumentNullException(nameof(hash));
 
-            using (processBlocksMutex.LockAsync().GetAwaiter().GetResult())
+            var coins = Enumerable.Empty<BlockIDProto>();
+
+            try
             {
+                using var session = unitOfWork.Document.OpenSession();
+
+                coins = session.Query<BlockIDProto>()
+                    .Where(x => x.Node.Equals(httpService.NodeIdentity) && x.SignedBlock.Coin.Stamp.Equals(hash)).ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< BlockGraphService.GetCoins >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(coins);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private async Task ProcessBlocks()
+        {
+            using (await processBlocksMutex.LockAsync())
+            {
+                processBlocksTimer.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+
                 try
                 {
-                    var rangeBlockGraphTasks = new List<Task<IEnumerable<BlockGraphProto>>>();
-                    var batchSize = 100;
-                    var numberOfBatches = (int)Math.Ceiling((double)unitOfWork.MemPool.Count() / batchSize);
-
-                    for (int n = 0; n < numberOfBatches; n++)
-                        rangeBlockGraphTasks.Add(unitOfWork.MemPool.GetRange(n * batchSize, batchSize));
-
-                    var graphs = (await Task.WhenAll(rangeBlockGraphTasks)).SelectMany(x => x);
-
-                    graphs.ForEach(x =>
+                    while (dataProvider.DataQueue.TryDequeue(out BlockGraphProto x))
                     {
                         if (!VerifiySignature(x.Block))
                         {
-                            logger.LogError($"BlockGraphService: unable to verify signature for block {x.Block.Round} from node {x.Block.Node}");
+                            logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: Unable to verify signature for block {x.Block.Round} from node {x.Block.Node}");
                             return;
                         }
 
-                        if (x.Prev != null && x.Prev.Round != 0)
+                        if (x.Prev != null && x.Prev?.Round != 0)
                         {
                             if (!VerifiySignature(x.Prev))
                             {
-                                logger.LogError($"BlockGraphService: unable to verify signature for previous block on block {x.Block.Round} from node {x.Block.Node}");
+                                logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: Unable to verify signature for previous block on block {x.Block.Round} from node {x.Block.Node}");
                                 return;
                             }
 
                             if (x.Prev.Node != x.Block.Node)
                             {
-                                logger.LogError($"BlockGraphService: previous block node does not match on block {x.Block.Round} from node {x.Block.Node}");
+                                logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: Previous block node does not match on block {x.Block.Round} from node {x.Block.Node}");
                                 return;
                             }
 
                             if (x.Prev.Round + 1 != x.Block.Round)
                             {
-                                logger.LogError($"BlockGraphService: previous block round is invalid on block {x.Block.Round} from node {x.Block.Node}");
+                                logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: Previous block round is invalid on block {x.Block.Round} from node {x.Block.Node}");
                                 return;
                             }
                         }
@@ -762,27 +599,33 @@ namespace Coin.API.Services
 
                             if (!VerifiySignature(dep.Block))
                             {
-                                logger.LogError($"BlockGraphService: unable to verify signature for block reference {x.Block.Round} from node {x.Block.Node}");
+                                logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: Unable to verify signature for block reference {x.Block.Round} from node {x.Block.Node}");
                                 return;
                             }
 
                             if (dep.Block.Node == x.Block.Node)
                             {
-                                logger.LogError($"BlockGraphService: block references includes a block from same node in block reference  {x.Block.Round} from node {x.Block.Node}");
+                                logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: Block references includes a block from same node in block reference  {x.Block.Round} from node {x.Block.Node}");
                                 return;
                             }
                         }
 
                         Graph.Add(x.ToBlockGraph());
-                    });
+                    }
+                }
+                catch (Raven.Client.Exceptions.InvalidQueryException ex)
+                {
+                    logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: {ex.ToString()}");
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex.Message);
+                    logger.LogError($"<<< BlockGraphService.ProcessBlocks >>>: {ex.ToString()}");
+                }
+                finally
+                {
+                    processBlocksTimer.Change(processBlocksInterval, System.Threading.Timeout.Infinite);
                 }
             }
-
-            processBlocksTimer.Start();
         }
     }
 }

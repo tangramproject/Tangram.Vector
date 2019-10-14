@@ -1,24 +1,28 @@
 ﻿
 using Microsoft.Extensions.Logging;
+using Raven.Client.Documents;
 
 namespace Core.API.Model
 {
     public class UnitOfWork : IUnitOfWork
     {
-        public IMessageRepository Message { get; private set; }
-        public IMessageLinkRepository MessageLink { get; private set; }
-        public IMemPoolRepository MemPool { get; private set; }
+        public IBlockGraphRepository BlockGraph { get; private set; }
         public IBlockIDRepository BlockID { get; private set; }
-        public INotIncludedRepository NotIncluded { get; private set; }
+        public IMessageRepository Message { get; private set; }
+        public IJobRepository Job { get; private set; }
+        public IInterpretedRepository Interpreted { get; private set; }
 
-        public UnitOfWork(string filePath, ILogger<UnitOfWork> logger)
+        public IDocumentStore Document { get; }
+
+        public UnitOfWork(IDbContext dbContext, ILogger<UnitOfWork> logger)
         {
-            MemPool = new MemPoolRepository("MemPool", filePath, logger);
-            Message = new MessageRepository("MessagePool", filePath, logger);
-            MessageLink = new MessageLinkRepository("MessagePool", filePath, logger);
-            BlockID = new BlockIDRepository("BlockID", filePath, logger);
-        }
+            Document = dbContext.Document;
 
-        public void Dispose() => DbContext.Instance.Dispose();
+            BlockGraph = new BlockGraphRepository(dbContext, logger);
+            BlockID = new BlockIDRepository(dbContext, logger);
+            Message = new MessageRepository(dbContext, logger);
+            Job = new JobRepository(dbContext, logger);
+            Interpreted = new InterpretedRepository(dbContext, logger);
+        }
     }
 }

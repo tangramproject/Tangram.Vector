@@ -1,5 +1,4 @@
-﻿using Core.API.Onion;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -45,7 +44,6 @@ namespace TGMGateway
                 app.UseHsts();
             }
 
-            app.UseMvc();
             app.UseOcelot().Wait();
         }
     }

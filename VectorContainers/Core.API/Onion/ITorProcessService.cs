@@ -14,5 +14,6 @@ namespace Core.API.Onion
         void StartOnion();
         Task<HiddenServiceDetails> GetHiddenServiceDetailsAsync();
         Task<SignedHashResponse> SignedHashAsync(byte[] hash);
+        bool OnionStarted { get; }
     }
 }

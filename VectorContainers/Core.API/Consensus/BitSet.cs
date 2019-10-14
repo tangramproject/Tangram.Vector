@@ -10,7 +10,7 @@ namespace Core.API.Consensus
 
         public BitSet(int size)
         {
-            ulong words = ((ulong)size + 63) >> 6;
+            ulong words = 100000; //((ulong)size + 63) >> 6;
             Commits = new ulong[words];
             Prepares = new ulong[words];
         }

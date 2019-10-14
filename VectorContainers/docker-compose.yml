@@ -1,0 +1,15 @@
+version: '3.4'
+
+services:
+  onion.api:
+    image: ${DOCKER_REGISTRY-}onionapi
+    build:
+      context: .
+      dockerfile: Onion.API/Dockerfile
+
+  tgmgateway:
+    image: ${DOCKER_REGISTRY-}tgmgateway
+    build:
+      context: .
+      dockerfile: TGMGateway/Dockerfile
+

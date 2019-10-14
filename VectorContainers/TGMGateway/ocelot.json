@@ -37,7 +37,7 @@
       "UpstreamHttpMethod": [ "Post" ]
     },
     {
-      "DownstreamPathTemplate": "/api/Coin/{address}}",
+      "DownstreamPathTemplate": "/api/Coin/{address}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {
@@ -49,7 +49,19 @@
       "UpstreamHttpMethod": [ "Get" ]
     },
     {
-      "DownstreamPathTemplate": "/api/BlockGraph",
+      "DownstreamPathTemplate": "/api/Coin/coins/{skip}/{take}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5001
+        }
+      ],
+      "UpstreamPathTemplate": "/coins/{skip}/{take}",
+      "UpstreamHttpMethod": [ "Get" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/BlockGraph/blockgraph",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {
@@ -61,7 +73,7 @@
       "UpstreamHttpMethod": [ "Post" ]
     },
     {
-      "DownstreamPathTemplate": "/api/BlockGraph/blockheight",
+      "DownstreamPathTemplate": "/api/BlockGraph/mempool/{hash}/{round}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {
@@ -69,7 +81,55 @@
           "Port": 5001
         }
       ],
-      "UpstreamPathTemplate": "/blockheight",
+      "UpstreamPathTemplate": "/mempool/{hash}/{round}",
+      "UpstreamHttpMethod": [ "Get" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/BlockGraph/blockgraphs",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5001
+        }
+      ],
+      "UpstreamPathTemplate": "/blockgraphs",
+      "UpstreamHttpMethod": [ "Post" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/BlockGraph/height",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5001
+        }
+      ],
+      "UpstreamPathTemplate": "/height",
+      "UpstreamHttpMethod": [ "Get" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/BlockGraph/networkheight",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5001
+        }
+      ],
+      "UpstreamPathTemplate": "/networkheight",
+      "UpstreamHttpMethod": [ "Get" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/BlockGraph/identity",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5001
+        }
+      ],
+      "UpstreamPathTemplate": "/identity",
       "UpstreamHttpMethod": [ "Get" ]
     },
     {

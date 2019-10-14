@@ -19,10 +19,11 @@ using Newtonsoft.Json;
 using DotNetTor.SocksPort;
 using Core.API.Models;
 using Core.API.Signatures;
+using Microsoft.Extensions.Hosting;
 
 namespace Core.API.Onion
 {
-    public class TorProcessService : HostedService, ITorProcessService
+    public class TorProcessService : BackgroundService, ITorProcessService
     {
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
@@ -50,7 +51,7 @@ namespace Core.API.Onion
 
         public bool OnionStarted { get; private set; }
 
-        public TorProcessService(IConfiguration configuration, ILogger logger)
+        public TorProcessService(IConfiguration configuration, ILogger<TorProcessService> logger)
         {
             onionSection = configuration.GetSection(OnionConstants.ConfigSection);
 
@@ -238,6 +239,17 @@ namespace Core.API.Onion
             OnionStarted = false;
 
             CreateTorrc();
+
+            var torProcesses = Process.GetProcessesByName("tor");
+
+            if(torProcesses.Count() > 0)
+            {
+                foreach(var process in torProcesses)
+                {
+                    process.Kill();
+                }
+            }
+
             StartTorProcess().GetAwaiter();
         }
 
@@ -278,18 +290,17 @@ namespace Core.API.Onion
             var torrcContent = new string[] {
                 "AvoidDiskWrites 1",
                 string.Format("HashedControlPassword {0}", hashedPassword),
-                "SocksPort auto IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
-                "ControlPort auto",
                 "CookieAuthentication 1",
                 $"HiddenServiceDir {hiddenServicePath}",
                 $"HiddenServicePort {hiddenServicePort}",
                 $"KeyDirectory {keyDirectoryPath}",
                 "HiddenServiceVersion 3",
                 "CircuitBuildTimeout 10",
-                "KeepalivePeriod 60",
+                "KeepalivePeriod 120",
                 "NumEntryGuards 8",
+                $"SocksPort {socksPort} IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
                 $"ControlPort {controlPort}",
-                $"SocksPort {socksPort}",
+                "SafeLogging 1",
                 "Log notice stdout",
                 $"DataDirectory {onionDirectory}",
                 $"ControlPortWriteToFile {controlPortPath}"

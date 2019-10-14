@@ -17,9 +17,9 @@ namespace Onion.API.Controllers
     {
         ITorProcessService _torProcessService;
 
-        public OnionController(IHostedService onionService)
+        public OnionController(ITorProcessService onionService)
         {
-            _torProcessService = (ITorProcessService)onionService;
+            _torProcessService = onionService;
         }
 
         [HttpGet("hsdetails")]
@@ -32,6 +32,12 @@ namespace Onion.API.Controllers
         public async Task<SignedHashResponse> Sign([FromBody] byte[] hash)
         {
             return await _torProcessService.SignedHashAsync(hash);
+        }
+
+        [HttpGet("istorstarted")]
+        public async Task<bool> IsTorStarted()
+        {
+            return await Task.FromResult(_torProcessService.OnionStarted);
         }
     }
 }

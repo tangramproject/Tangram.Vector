@@ -1,7 +1,11 @@
-﻿using System.Net;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Coin.API.Services;
+using Core.API.Helper;
+using Core.API.Model;
+using Microsoft.Extensions.Logging;
+using System;
+using Microsoft.AspNetCore.Http;
 
 namespace Coin.API.Controllers
 {
@@ -9,27 +13,85 @@ namespace Coin.API.Controllers
     [ApiController]
     public class CoinController : Controller
     {
-        readonly ICoinService coinService;
+        private readonly ICoinService coinService;
+        private readonly ILogger logger;
 
-        public CoinController(ICoinService coinService)
+        public CoinController(ICoinService coinService, ILogger<CoinController> logger)
         {
             this.coinService = coinService;
+            this.logger = logger;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="coin"></param>
+        /// <returns></returns>
         [HttpPost("mempool", Name = "AddCoin")]
-        [ProducesResponseType(typeof(byte[]), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(byte[]), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> AddCoin([FromBody] byte[] coin)
         {
-            var cn = await coinService.AddCoin(coin);
-            return new ObjectResult(new { protobuf = cn });
+            try
+            {
+                var coinProto = Util.DeserializeProto<CoinProto>(coin);
+                var coinByteArray = await coinService.AddCoin(coinProto);
+
+                return new ObjectResult(new { protobuf = coinByteArray });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< AddCoin - Controller >>>{ex.ToString()}");
+            }
+
+            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
         }
 
-        [HttpGet("{address}", Name = "GetCoin")]
-        [ProducesResponseType(typeof(byte[]), (int)HttpStatusCode.OK)]
-        public async Task<IActionResult> GetCoin(byte[] address)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="hash"></param>
+        /// <returns></returns>
+        [HttpGet("{hash}", Name = "GetCoin")]
+        [ProducesResponseType(typeof(byte[]), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetCoin(string hash)
         {
-            var coin = await coinService.GetCoin(address);
-            return new ObjectResult(new { protobuf = coin });
+            try
+            {
+                var coin = await coinService.GetCoin(hash);
+                return new ObjectResult(new { protobufs = coin });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< GetCoin - Controller >>>{ex.ToString()}");
+            }
+
+            return NotFound();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="skip"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
+        [HttpGet("coins/{skip}/{take}", Name = "GetCoins")]
+        [ProducesResponseType(typeof(byte[]), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetCoins(int skip, int take)
+        {
+            try
+            {
+                var coins = await coinService.GetCoins(skip, take);
+                return new ObjectResult(new { protobufs = coins });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< GetCoins - Controller >>>{ex.ToString()}");
+            }
+
+            return NotFound();
         }
     }
 }

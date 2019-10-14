@@ -1,13 +1,17 @@
 ﻿using System;
+using Raven.Client.Documents;
 
 namespace Core.API.Model
 {
-    public interface IUnitOfWork : IDisposable
+    public interface IUnitOfWork
     {
-        IMessageRepository Message { get; }
-        IMessageLinkRepository MessageLink { get; }
-        IMemPoolRepository MemPool { get; }
+        IDocumentStore Document { get; }
+
+        IBlockGraphRepository BlockGraph { get; }
         IBlockIDRepository BlockID { get; }
-        INotIncludedRepository NotIncluded { get; }
+        IMessageRepository Message { get; }
+        IJobRepository Job { get; }
+        IInterpretedRepository Interpreted { get; }
+
     }
 }

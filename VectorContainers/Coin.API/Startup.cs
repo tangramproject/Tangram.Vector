@@ -1,21 +1,20 @@
 ﻿using System;
-using Autofac;
-using Autofac.Extensions.DependencyInjection;
-using Core.API.Helper;
-using Core.API.Model;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Swashbuckle.AspNetCore.Swagger;
 using Coin.API.Services;
 using System.Diagnostics;
 using Core.API.Onion;
 using System.Net;
-using DotNetTor.SocksPort;
 using Core.API.Membership;
 using Core.API.Broadcast;
+using MihaZupan;
+using System.Net.Http;
+using Coin.API.Middlewares;
+using Core.API.Model;
+using Coin.API.Providers;
 
 namespace Coin.API
 {
@@ -29,92 +28,141 @@ namespace Coin.API
             {
                 Debug.WriteLine(eventArgs.Exception.ToString());
             };
-
-            CreateLMDBDirectory();
         }
 
         public IConfiguration Configuration { get; }
 
-        public IServiceProvider ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+            services.AddResponseCompression();
+
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+            services.AddMvc(option => option.EnableEndpointRouting = false);
+
+            services.AddControllers();
 
             services.AddSwaggerGen(options =>
             {
-                options.DescribeAllEnumsAsStrings();
-                options.SwaggerDoc("v1", new Info
+                options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
                 {
+                    License = new Microsoft.OpenApi.Models.OpenApiLicense
+                    {
+                        Name = "Attribution-NonCommercial-NoDerivatives 4.0 International",
+                        Url = new Uri("https://raw.githubusercontent.com/tangramproject/Tangram.Vector/initial/LICENSE")
+                    },
                     Title = "Tangram Coin HTTP API",
                     Version = "v1",
                     Description = "Backend services.",
-                    TermsOfService = "https://tangrams.io/legal/",
-                    Contact = new Contact() { Email = "dev@getsneak.org", Url = "https://tangrams.io/about-tangram/team/" }
+                    TermsOfService = new Uri("https://tangrams.io/legal/"),
+                    Contact = new Microsoft.OpenApi.Models.OpenApiContact
+                    {
+                        Email = "dev@getsneak.org",
+                        Url = new Uri("https://tangrams.io/about-tangram/team/")
+                    }
                 });
             });
 
-            services.AddCors(options =>
-            {
-                options.AddPolicy("CorsPolicy",
-                    builder => builder.AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials());
-            });
+            //services.AddCors(options =>
+            //{
+            //    options.AddPolicy("default",
+            //        builder => builder.AllowAnyOrigin()
+            //        .AllowAnyMethod()
+            //        .AllowAnyHeader()
+            //        .AllowCredentials());
+            //});
 
             services.AddHttpContextAccessor();
+
             services.AddOptions();
 
-            services.AddTransient<IBroadcastClient, BroadcastClient>();
-            services.AddTransient<IMembershipServiceClient, MembershipServiceClient>();
+            services.AddSingleton<SigningProvider>();
 
-            services.AddSingleton<IUnitOfWork, UnitOfWork>(sp =>
-            {
-                var logger = sp.GetRequiredService<ILogger<UnitOfWork>>();
-                var filePath = Configuration["LMDB:FilePath"];
-                return new UnitOfWork(filePath, logger);
-            });
+            services.AddSingleton<SyncProvider>();
+            services.AddHostedService<SyncService>();
 
-            services.AddSingleton<IBlockGraphService, BlockGraphService>(sp =>
-            {
-                var unitOfWork = sp.GetRequiredService<IUnitOfWork>();
-                var membershipServiceClient = sp.GetRequiredService<IMembershipServiceClient>();
-                var onionServiceClient = sp.GetRequiredService<IOnionServiceClient>();
-                var logger = sp.GetRequiredService<ILogger<BlockGraphService>>();
-                var torClient = sp.GetRequiredService<ITorClient>();
+            services.AddSingleton<HierarchicalDataProvider>();
+            services.AddHostedService<HierarchicalDataService>();
 
-                return new BlockGraphService(unitOfWork, membershipServiceClient, onionServiceClient, logger, torClient);         
-            });
+            services.AddSingleton<ReplyProvider>();
+            services.AddHostedService<ReplyDataService>();
 
-            services.AddTransient<ICoinService, CoinService>();
+            services.AddSingleton<MissingBlocksProvider>();
+            services.AddHostedService<MissingBlocksService>();
+
+            services.AddSingleton<IDbContext, DbContext>();
+            services.AddSingleton<IUnitOfWork, UnitOfWork>();
 
             services.AddSingleton<IOnionServiceClientConfiguration, OnionServiceClientConfiguration>();
 
             services.AddHttpClient<IOnionServiceClient, OnionServiceClient>();
 
+            services.AddSingleton<IHttpService, HttpService>();
+
             services.AddSingleton(sp =>
             {
+                var logger = sp.GetService<ILogger<Startup>>();
+
+                //var onionStarted = sp.GetService<IOnionServiceClient>()
+                //                     .IsTorStartedAsync()
+                //                     .GetAwaiter()
+                //                     .GetResult();
+
+                //while (!onionStarted)
+                //{
+                //    logger.LogWarning("Unable to verify Tor is started... retrying in a few seconds");
+                //    Thread.Sleep(5000);
+                //    onionStarted = sp.GetService<IOnionServiceClient>()
+                //                     .IsTorStartedAsync()
+                //                     .GetAwaiter()
+                //                     .GetResult();
+                //}
+
+                //logger.LogInformation("Tor is started... configuring Socks Port Handler");
+
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
                 var onionServiceClientConfiguration = sp.GetService<IOnionServiceClientConfiguration>();
 
-                var handler = new SocksPortHandler(onionServiceClientConfiguration.SocksHost, onionServiceClientConfiguration.SocksPort);
+                var proxy = new HttpToSocks5Proxy(new[]
+                {
+                    new ProxyInfo(onionServiceClientConfiguration.SocksHost, onionServiceClientConfiguration.SocksPort)
+                });
+
+                var handler = new HttpClientHandler { Proxy = proxy };
 
                 return handler;
             });
 
+            services.AddTransient<IBroadcastClient, BroadcastClient>();
+
             services.AddHttpClient<ITorClient, TorClient>()
-                .ConfigurePrimaryHttpMessageHandler(
-                    p => p.GetRequiredService<SocksPortHandler>()
-                )
-                .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+                    //.ConfigurePrimaryHttpMessageHandler(p => p.GetRequiredService<HttpClientHandler>())
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler((services, request) =>
+                    {
+                        var logger = services.GetService<ILogger<Startup>>();
 
-            var container = new ContainerBuilder();
-            container.Populate(services);
+                        if (request.Method == HttpMethod.Get)
+                        {
+                            return Core.API.Helper.PollyEx.GetRetryPolicyAsync(logger);
+                        }
 
-            return new AutofacServiceProvider(container.Build());
+                        if (request.Method == HttpMethod.Post)
+                        {
+                            return Core.API.Helper.PollyEx.GetNoOpPolicyAsync();
+                        }
+
+                        return Core.API.Helper.PollyEx.GetRetryPolicy();
+                    });
+
+            services.AddTransient<IMembershipServiceClient, MembershipServiceClient>();
+
+            services.AddSingleton<IBlockGraphService, BlockGraphService>();
+
+            services.AddTransient<ICoinService, CoinService>();
         }
 
-        public void Configure(IApplicationBuilder app, Microsoft.AspNetCore.Hosting.IHostingEnvironment env, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)
         {
             var pathBase = Configuration["PATH_BASE"];
             if (!string.IsNullOrEmpty(pathBase))
@@ -122,10 +170,15 @@ namespace Coin.API
                 app.UsePathBase(pathBase);
             }
 
-            app.UseStaticFiles();
-            app.UseCors("CorsPolicy");
-            app.UseMvcWithDefaultRoute();
+            app.UseSync();
 
+            app.UseStaticFiles();
+            app.UseRouting();
+            app.UseCors("default");
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
             app.UseSwagger()
                .UseSwaggerUI(c =>
                {
@@ -133,13 +186,6 @@ namespace Coin.API
                    c.OAuthClientId("coinswaggerui");
                    c.OAuthAppName("Coin Swagger UI");
                });
-        }
-
-        private void CreateLMDBDirectory()
-        {
-            var LmdbPath = System.IO.Path.Combine(Util.EntryAssemblyPath(), Configuration["LMDB:FilePath"]);
-            if (!System.IO.Directory.Exists(LmdbPath))
-                System.IO.Directory.CreateDirectory(LmdbPath);
         }
     }
 }

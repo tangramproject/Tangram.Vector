@@ -9,21 +9,21 @@ namespace Core.API.Model
     public class CoinProto
     {
         [ProtoMember(1)]
-        public byte[] Commitment { get; set; }
+        public string Commitment { get; set; }
         [ProtoMember(2)]
-        public byte[] Hash { get; set; }
+        public string Hash { get; set; }
         [ProtoMember(3)]
-        public byte[] Hint { get; set; }
+        public string Hint { get; set; }
         [ProtoMember(4)]
-        public byte[] Keeper { get; set; }
+        public string Keeper { get; set; }
         [ProtoMember(5)]
-        public byte[] Principle { get; set; }
+        public string Principle { get; set; }
         [ProtoMember(6)]
-        public byte[] RangeProof { get; set; }
+        public string RangeProof { get; set; }
         [ProtoMember(7)]
-        public byte[] Stamp { get; set; }
+        public string Stamp { get; set; }
         [ProtoMember(8)]
-        public byte[] Network { get; set; }
+        public string Network { get; set; }
         [ProtoMember(9)]
         public int Version { get; set; }
 

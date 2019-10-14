@@ -6,6 +6,8 @@ using SwimProtocol;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using System.IO;
 
 namespace Membership.API.Controllers
 {
@@ -15,29 +17,40 @@ namespace Membership.API.Controllers
     {
         private ISwimProtocolProvider _swimProtocolProvider;
         private ISwimProtocol _swimProtocol;
+        private ILogger _logger;
 
-        public MembershipController(ISwimProtocolProvider swimProtocolProvider, IHostedService swimProtocol)
+        public MembershipController(ISwimProtocolProvider swimProtocolProvider, ISwimProtocol swimProtocol, ILogger<MembershipController> logger)
         {
             _swimProtocolProvider = swimProtocolProvider;
-            _swimProtocol = (ISwimProtocol)swimProtocol;
+            _swimProtocol = swimProtocol;
+            _logger = logger;
         }
 
         [HttpPost("messages", Name = "AddMessage")]
         [ProducesResponseType(StatusCodes.Status202Accepted)]
-        public async Task<IActionResult> AddMessage([FromBody]CompositeMessage compositeMessage)
+        public async Task<IActionResult> AddMessage([FromBody] CompositeMessage compositeMessage)
         {
-            _swimProtocolProvider.OnMessageReceived(new ReceivedMessageEventArgs() { CompositeMessage = compositeMessage });
-            return Accepted();
+            if (compositeMessage != null)
+            {
+                _swimProtocolProvider.OnMessageReceived(new ReceivedMessageEventArgs()
+                { CompositeMessage = compositeMessage });
+            }
+            else
+            {
+                _logger.LogWarning("Received NULL compositeMessage... skipping");
+            }
+
+            return await Task.FromResult(Accepted());
         }
 
         [HttpGet("members", Name = "Get Members")]
         [ProducesResponseType(typeof(List<INode>), StatusCodes.Status200OK)]
         public async Task<IEnumerable<INode>> GetMembers()
         {
-            return _swimProtocol.Members.Select(x => new Node
+            return await Task.FromResult(_swimProtocol.Members.Select(x => new Node
             {
                 Endpoint = x.Endpoint
-            });
+            }));
         }
     }
 }

@@ -14,6 +14,8 @@ namespace Core.API.Onion
         string OnionServiceAddress { get; }
 
         string GetHiddenServiceDetailsRoute { get; }
+        string IsTorStartedRoute { get; }
+
         string SignMessageRoute { get; }
     }
 }

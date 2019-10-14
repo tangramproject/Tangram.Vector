@@ -11,6 +11,7 @@ namespace SwimProtocol
         Dead,
         Alive,
         PingReq,
-        Composite
+        Composite,
+        Suspect
     }
 }

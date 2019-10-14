@@ -1,93 +1,171 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Core.API.Helper;
 using Core.API.Model;
-using Dawn;
+using Core.API.Onion;
+using Microsoft.Extensions.Logging;
+using System.Linq;
+using Core.API.Membership;
 
 namespace MessagePool.API.Services
 {
     public class MessagePoolService : IMessagePoolService
     {
-        readonly IUnitOfWork unitOfWork;
+        readonly IOnionServiceClient onionServiceClient;
+        readonly ILogger logger;
+        private readonly IUnitOfWork unitOfWork;
+        private readonly ITorClient torClient;
+        private readonly IMembershipServiceClient membershipServiceClient;
 
-        public MessagePoolService(IUnitOfWork unitOfWork)
+        public MessagePoolService(IOnionServiceClient onionServiceClient, IUnitOfWork unitOfWork, ITorClient torClient,
+            IMembershipServiceClient membershipServiceClient, ILogger<MessagePoolService> logger)
         {
+            this.onionServiceClient = onionServiceClient;
             this.unitOfWork = unitOfWork;
+            this.torClient = torClient;
+            this.membershipServiceClient = membershipServiceClient;
+            this.logger = logger;
         }
 
-        public async Task<MessageProto> AddMessage(MessageProto messageProto)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public async Task<byte[]> AddMessage(byte[] message)
         {
-            var link = await unitOfWork.MessageLink.Get(messageProto.Address.ToBytes());
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
 
-            if (link == null)
+            try
             {
-                var messageLink = new MessageProtoList
+                var messageProto = Util.DeserializeProto<MessageProto>(message);
+                var msg = await unitOfWork.Message.StoreOrUpdate(messageProto);
+
+                if (msg != null)
                 {
-                    Address = messageProto.Address,
-                    Keys = new List<Guid> { Guid.NewGuid() }
-                };
+                    var hash = Core.API.LibSodium.Cryptography.GenericHashNoKey(message);
+                    var signed = await onionServiceClient.SignHashAsync(hash);
 
-                await unitOfWork.MessageLink.Put(messageProto.Address.ToBytes(), messageLink);
-                await unitOfWork.Message.Put(messageLink.Keys.First().ToString().ToBytes(), messageProto);
-            }
-            else
-            {
-                Monitor.Enter(link);
+                    Broadcast(message);
 
-                try
-                {
-                    var guid = Guid.NewGuid();
-                    link.Keys.Add(guid);
-                    await unitOfWork.MessageLink.Put(messageProto.Address.ToBytes(), link);
-                    await unitOfWork.Message.Put(guid.ToString().ToBytes(), messageProto);
-                }
-                finally
-                {
-                    Monitor.Exit(link);
-                }
-            }
-
-            return messageProto;
-        }
-
-
-        public async Task<List<MessageProto>> GetMessages(string address, int skip, int take)
-        {
-            List<MessageProto> messageProtos = null;
-
-            var link = await unitOfWork.MessageLink.Get(address.ToBytes());
-
-            if (link != null)
-            {
-                messageProtos = new List<MessageProto>();
-
-                foreach (var key in link.Keys)
-                {
-                    var msg = await unitOfWork.Message.Get(key.ToString().ToBytes());
-
-                    if (msg != null)
+                    return Util.SerializeProto(new MessageSignedBlockProto
                     {
-                        msg.Address = Convert.ToBase64String(Encoding.UTF8.GetBytes(msg.Address));
-                        msg.Body = Convert.ToBase64String(Encoding.UTF8.GetBytes(msg.Body));
-                        messageProtos.Add(msg);
-                    }
-
+                        Hash = hash.ToHex(),
+                        PublicKey = signed.PublicKey.ToHex(),
+                        Signature = signed.Signature.ToHex()
+                    });
                 }
-
-                messageProtos = messageProtos.Select(m => m).Skip(skip).Take(take).ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< MessagePoolService.AddMessage >>>: {ex.Message}");
             }
 
-            return messageProtos;
+            return null;
         }
 
-        public async Task<int> Count(string address)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public async Task<byte[]> GetMessages(string key)
         {
-            var link = await unitOfWork.MessageLink.Get(address.ToBytes());
-            return link != null ? link.Keys.Count() : 0;
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+
+            byte[] result = null;
+
+            try
+            {
+                var messages = await unitOfWork.Message.GetMany(key);
+                if (messages?.Any() == true)
+                {
+                    result = Util.SerializeProto(messages);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< MessagePoolService.GetMessages >>>: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="skip"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
+        public async Task<byte[]> GetMessages(string key, int skip, int take)
+        {
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+
+            byte[] result = null;
+
+            try
+            {
+                var messages = await unitOfWork.Message.GetMany(key);
+                if (messages?.Any() == true)
+                {
+                    result = Util.SerializeProto(messages.Skip(skip).Take(take));
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< MessagePoolService.GetMessages >>>: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public async Task<int> Count(string key)
+        {
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+
+            int count = 0;
+
+            try
+            {
+                count = await unitOfWork.Message.Count(key);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< MessagePoolService.Count >>>: {ex.Message}");
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private void Broadcast(byte[] message)
+        {
+            _ = Task.Factory.StartNew(async () =>
+            {
+                var members = await membershipServiceClient.GetMembersAsync().ConfigureAwait(false);
+                foreach (var member in members)
+                {
+                    _ = Task.Factory.StartNew(async () =>
+                    {
+                        var uri = new Uri(new Uri(member.Endpoint), "message");
+                        _ = await torClient.PostAsJsonAsync(uri, message);
+                    });
+                }
+            });
         }
     }
 }

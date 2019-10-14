@@ -27,6 +27,11 @@ namespace SwimProtocol
             return JsonConvert.SerializeObject(this);
         }
 
+        public virtual int GetMessageOverrideWeight(MessageBase message)
+        {
+            return 0;
+        }
+
         [JsonIgnore]
         public bool IsValid
         {

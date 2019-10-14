@@ -24,6 +24,8 @@ namespace Core.API.Onion
 
         public string SignMessageRoute { get; }
 
+        public string IsTorStartedRoute { get; }
+
         public OnionServiceClientConfiguration(IConfiguration configuration)
         {
             var onionSection = configuration.GetSection(OnionConstants.ConfigSection);
@@ -36,6 +38,7 @@ namespace Core.API.Onion
             OnionServiceAddress = onionSection.GetValue<string>(OnionConstants.OnionServiceAddress);
             GetHiddenServiceDetailsRoute = "api/Onion/hsdetails";
             SignMessageRoute = "api/Onion/sign";
+            IsTorStartedRoute = "api/Onion/istorstarted";
         }
     }
 }

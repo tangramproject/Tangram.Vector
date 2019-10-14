@@ -1,14 +1,12 @@
-﻿using Autofac;
-using Autofac.Extensions.DependencyInjection;
-using Core.API.Onion;
+﻿using Core.API.Onion;
 using DotNetTor.SocksPort;
 using Membership.API.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Swashbuckle.AspNetCore.Swagger;
 using SwimProtocol;
 using System;
 using System.Diagnostics;
@@ -30,29 +28,66 @@ namespace Membership.API
 
         public IConfiguration Configuration { get; }
 
-        public IServiceProvider ConfigureServices(IServiceCollection services)
+        IPAddress GetPublicHostIp(string serviceUrl = "https://ipv4.icanhazip.com/")
         {
-            services.AddMvc();
+            string ip = null;
+            var membershipSection = Configuration.GetSection("membership");
+            var publicAddressSection = membershipSection.GetSection("PublicHost");
+
+            if (publicAddressSection.Exists())
+                ip = publicAddressSection.Value;
+            else
+                ip = new WebClient()
+                    .DownloadString(serviceUrl)
+                    .Trim();
+
+            return IPAddress.Parse(ip);
+        }
+
+        private string GetPublicHostPort()
+        {
+            string port = null;
+            var membershipSection = Configuration.GetSection("membership");
+            var publicPortSection = membershipSection.GetSection("PublicPort");
+
+            if (publicPortSection.Exists())
+                port = publicPortSection.Value;
+            else
+                port = "8080";
+
+            return port;
+        }
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddResponseCompression();
+
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+            services.AddMvc(option => option.EnableEndpointRouting = false);
+
+            services.AddControllers()
+                    .AddNewtonsoftJson();
+
+
             services.AddSwaggerGen(options =>
             {
-                options.DescribeAllEnumsAsStrings();
-                options.SwaggerDoc("v1", new Info
+                options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
                 {
+                    License = new Microsoft.OpenApi.Models.OpenApiLicense
+                    {
+                        Name = "Attribution-NonCommercial-NoDerivatives 4.0 International",
+                        Url = new Uri("https://raw.githubusercontent.com/tangramproject/Tangram.Vector/initial/LICENSE")
+                    },
                     Title = "Tangram Membership HTTP API",
                     Version = "v1",
                     Description = "Backend services.",
-                    TermsOfService = "https://tangrams.io/legal/",
-                    Contact = new Contact() { Email = "dev@getsneak.org", Url = "https://tangrams.io/about-tangram/team/" }
+                    TermsOfService = new Uri("https://tangrams.io/legal/"),
+                    Contact = new Microsoft.OpenApi.Models.OpenApiContact
+                    {
+                        Email = "dev@getsneak.org",
+                        Url = new Uri("https://tangrams.io/about-tangram/team/")
+                    }
                 });
-            });
-
-            services.AddCors(options =>
-            {
-                options.AddPolicy("CorsPolicy",
-                    builder => builder.AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials());
             });
 
             services.AddHttpContextAccessor();
@@ -65,6 +100,25 @@ namespace Membership.API
 
             services.AddSingleton(sp =>
             {
+                var logger = sp.GetService<ILogger<Startup>>();
+
+                //var onionStarted = sp.GetService<IOnionServiceClient>()
+                //                     .IsTorStartedAsync()
+                //                     .GetAwaiter()
+                //                     .GetResult();
+
+                //while(!onionStarted)
+                //{
+                //    logger.LogWarning("Unable to verify Tor is started... retrying in a few seconds");
+                //    Thread.Sleep(5000);
+                //    onionStarted = sp.GetService<IOnionServiceClient>()
+                //                     .IsTorStartedAsync()
+                //                     .GetAwaiter()
+                //                     .GetResult();
+                //}
+
+                //logger.LogInformation("Tor is started... configuring Socks Port Handler");
+
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
                 var onionServiceClientConfiguration = sp.GetService<IOnionServiceClientConfiguration>();
@@ -75,31 +129,31 @@ namespace Membership.API
             });
 
             services.AddHttpClient<ITorClient, TorClient>()
-                .ConfigurePrimaryHttpMessageHandler(
-                    p => p.GetRequiredService<SocksPortHandler>()
-                )
+                //.ConfigurePrimaryHttpMessageHandler(
+                //    p => p.GetRequiredService<SocksPortHandler>()
+                //)
                 .SetHandlerLifetime(TimeSpan.FromMinutes(5));
 
             services.AddSingleton<ISwimNode, SwimNode>(sp =>
             {
-                var onionServiceClientDetails = sp.GetService<IOnionServiceClient>()
-                                                  .GetHiddenServiceDetailsAsync()
-                                                  .GetAwaiter()
-                                                  .GetResult();
+                //var onionServiceClientDetails = sp.GetService<IOnionServiceClient>()
+                //                                  .GetHiddenServiceDetailsAsync()
+                //                                  .GetAwaiter()
+                //                                  .GetResult();
 
-                return new SwimNode($"http://{onionServiceClientDetails.Hostname}");
+                var publicIp = GetPublicHostIp();
+                var publicPort = GetPublicHostPort();
+
+                return new SwimNode($"http://{publicIp}:{publicPort}");
             });
 
             services.AddSingleton<ISwimProtocolProvider, SwimProtocolProvider>();
-            services.AddSingleton<IHostedService, FailureDetection>();
+            services.AddSingleton<ISwimProtocol, FailureDetection>();
 
-            var container = new ContainerBuilder();
-            container.Populate(services);
-
-            return new AutofacServiceProvider(container.Build());
+            services.AddHostedService<FailureDetection>();
         }
-
-        public void Configure(IApplicationBuilder app, Microsoft.AspNetCore.Hosting.IHostingEnvironment env, ILoggerFactory loggerFactory)
+ 
+        public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)
         {
             var pathBase = Configuration["PATH_BASE"];
             if (!string.IsNullOrEmpty(pathBase))
@@ -107,10 +161,13 @@ namespace Membership.API
                 app.UsePathBase(pathBase);
             }
 
-            //app.UseHttpsRedirection();
             app.UseStaticFiles();
-            app.UseCors("CorsPolicy");
-            app.UseMvcWithDefaultRoute();
+            app.UseRouting();
+            app.UseCors("default");
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
 
             app.UseSwagger()
                .UseSwaggerUI(c =>

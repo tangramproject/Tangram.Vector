@@ -1,0 +1,21 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.0.100' # SDK Version to use.
+    - run:  |
+        cd VectorContainers
+        dotnet restore VectorContainers.sln
+        dotnet publish Coin.API --output publish --configuration Release
+        dotnet publish MessagePool.API --output publish --configuration Release
+        dotnet publish Onion.API --output publish --configuration Release
+        dotnet publish Membership.API --output publish --configuration Release

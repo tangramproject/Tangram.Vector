@@ -12,11 +12,16 @@ using ProtoBuf;
 using Core.API.LibSodium;
 using Core.API.Model;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace Core.API.Helper
 {
     public static class Util
     {
+        public const string hexUpper = "0123456789ABCDEF";
+
         public static byte[] GetZeroBytes()
         {
             byte[] bytes = new byte[0];
@@ -226,6 +231,44 @@ namespace Core.API.Helper
             Buffer.BlockCopy(first, 0, ret, 0, first.Length);
             Buffer.BlockCopy(second, 0, ret, first.Length, second.Length);
             return ret;
+        }
+
+        public static ulong HostNameToHex(string hostname)
+        {
+            if (hostname == null)
+                throw new ArgumentNullException(nameof(hostname));
+
+            var v = new StringBuilder();
+            ulong node;
+
+            try
+            {
+                for (int i = 6; i < 12; i++)
+                {
+                    var c = hostname[i];
+                    v.Append(new char[] { hexUpper[c >> 4], hexUpper[c & 0x0f] });
+                }
+
+                var byteHex = Cryptography.GenericHashNoKey(v.ToString());
+
+                node = (ulong)BitConverter.ToInt64(byteHex, 0);
+                node = (ulong)Convert.ToInt64(node.ToString().Substring(0, 5));
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
+            return node;
+        }
+
+        public static JToken ReadJToken(HttpResponseMessage httpResponseMessage, string attr)
+        {
+            var read = httpResponseMessage.Content.ReadAsStringAsync().Result;
+            var jObject = JObject.Parse(read);
+            var jToken = jObject.GetValue(attr);
+
+            return jToken;
         }
     }
 }

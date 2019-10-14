@@ -1,12 +1,5 @@
-﻿using Core.API.Models;
-using DotNetTor.SocksPort;
-using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Net;
+﻿using System;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -48,28 +41,58 @@ namespace Core.API.Onion
             return await _client.PostAsync(requestUri, content, cancellationToken);
         }
 
-        public Task<HttpResponseMessage> PostAsJsonAsync<T>(string requestUri, T content)
+        public async Task<HttpResponseMessage> PostAsJsonAsync<T>(string requestUri, T content)
         {
-            return _client.PostAsJsonAsync(requestUri, content);
+            return await _client.PostAsJsonAsync(requestUri, content);
         }
 
-        public Task<HttpResponseMessage> PostAsJsonAsync<T>(Uri requestUri, T content)
+        public async Task<HttpResponseMessage> PostAsJsonAsync<T>(Uri requestUri, T content)
         {
-            return _client.PostAsJsonAsync(requestUri, content);
+            return await _client.PostAsJsonAsync(requestUri, content);
         }
 
-        public Task<HttpResponseMessage> PostAsJsonAsync<T>(string requestUri, T content,
+        public async Task<HttpResponseMessage> PostAsJsonAsync<T>(string requestUri, T content,
             CancellationToken cancellationToken)
         {
-            return _client.PostAsJsonAsync(requestUri, content, cancellationToken);
+            return await _client.PostAsJsonAsync(requestUri, content, cancellationToken);
         }
 
-        public Task<HttpResponseMessage> PostAsJsonAsync<T>(
+        public async Task<HttpResponseMessage> PostAsJsonAsync<T>(
             Uri requestUri,
             T content,
             CancellationToken cancellationToken)
         {
-            return _client.PostAsJsonAsync(requestUri, content, cancellationToken);
+            return await _client.PostAsJsonAsync(requestUri, content, cancellationToken);
+        }
+
+        public async Task<byte[]> GetByteArrayAsync(string requestUri)
+        {
+            return await _client.GetByteArrayAsync(requestUri);
+        }
+
+        public async Task<byte[]> GetByteArrayAsync(Uri requestUri)
+        {
+            return await _client.GetByteArrayAsync(requestUri);
+        }
+
+        public async Task<string> GetStringAsync(string requestUri)
+        {
+            return await _client.GetStringAsync(requestUri);
+        }
+
+        public async Task<string> GetStringAsync(Uri requestUri)
+        {
+            return await _client.GetStringAsync(requestUri);
+        }
+
+        public async Task<HttpResponseMessage> GetAsync(string requestUri, CancellationToken cancellationToken)
+        {
+            return await _client.GetAsync(requestUri, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> GetAsync(Uri requestUri, CancellationToken cancellationToken)
+        {
+            return await _client.GetAsync(requestUri, cancellationToken);
         }
     }
 }

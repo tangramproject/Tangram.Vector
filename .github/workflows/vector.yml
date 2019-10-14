@@ -49,3 +49,15 @@ jobs:
         ./Octo push --package=Tangram.Membership.API.2.$BUILD_NUMBER.nupkg
         ./Octo pack --id Tangram.Gateway --version 2.$BUILD_NUMBER --basePath "publish/TGMGateway"
         ./Octo push --package=Tangram.Gateway.2.$BUILD_NUMBER.nupkg
+        - uses: actions/setup-ruby@v1
+    - name: Send Webhook Notification
+      if: always()
+      env:
+        JOB_STATUS: ${{ job.status }}
+        WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        HOOK_OS_NAME: ${{ runner.os }}
+        WORKFLOW_NAME: ${{ github.workflow }}
+      run: |
+        git clone https://github.com/DiscordHooks/github-actions-discord-webhook.git webhook
+        bash webhook/send.sh $JOB_STATUS $WEBHOOK_URL
+      shell: bash

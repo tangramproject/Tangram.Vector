@@ -147,5 +147,33 @@ namespace Core.API.Model
 
             return Task.FromResult(count);
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="hash"></param>
+        /// <returns></returns>
+        public Task<IEnumerable<BlockIDProto>> GetManyCoins(string hash, ulong node)
+        {
+            if (string.IsNullOrEmpty(hash))
+                throw new ArgumentNullException(nameof(hash));
+
+            var coins = Enumerable.Empty<BlockIDProto>();
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+
+                coins = session.Query<BlockIDProto>()
+                    .Where(x => x.Node.Equals(node) && x.SignedBlock.Coin.Stamp.Equals(hash)).ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< BlockGraphService.GetCoins >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(coins);
+        }
     }
 }

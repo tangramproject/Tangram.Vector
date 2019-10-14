@@ -10,5 +10,6 @@ namespace Core.API.Model
         Task<bool> HasCoin(string hash);
         Task<IEnumerable<BlockIDProto>> GetRange(int skip, int take);
         Task<int> Count(ulong node);
+        Task<IEnumerable<BlockIDProto>> GetManyCoins(string hash, ulong node);
     }
 }

@@ -346,7 +346,7 @@ namespace Coin.API.Services
                         continue;
                     }
 
-                    var coins = await GetCoins(blockIdProto.SignedBlock.Coin.Stamp);
+                    var coins = await unitOfWork.BlockID.GetManyCoins(blockIdProto.SignedBlock.Coin.Stamp, httpService.NodeIdentity);
                     if (coins?.Any() == true)
                     {
                         var list = coins.ToList();
@@ -523,33 +523,6 @@ namespace Coin.API.Services
                     logger.LogError($"<<< BlockGraphService.BlockmaniaCallback >>>: {ex.ToString()}");
                 }
             });
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        private Task<IEnumerable<BlockIDProto>> GetCoins(string hash)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentNullException(nameof(hash));
-
-            var coins = Enumerable.Empty<BlockIDProto>();
-
-            try
-            {
-                using var session = unitOfWork.Document.OpenSession();
-
-                coins = session.Query<BlockIDProto>()
-                    .Where(x => x.Node.Equals(httpService.NodeIdentity) && x.SignedBlock.Coin.Stamp.Equals(hash)).ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockGraphService.GetCoins >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(coins);
         }
 
         /// <summary>

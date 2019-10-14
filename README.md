@@ -27,6 +27,7 @@ If you'd like to contribute to Tangram Vector (Node code), please know we're cur
 ## Building Vector
 git clone https://github.com/tangramproject/Tangram.Vector
 
+```
 cd VectorContainers  
 dotnet restore VectorContainers.sln
 dotnet publish TGMGateway --output publish --configuration Release  
@@ -34,3 +35,4 @@ dotnet publish Coin.API --output publish --configuration Release
 dotnet publish MessagePool.API --output publish --configuration Release
 dotnet publish Onion.API --output publish --configuration Release
 dotnet publish Membeship.API --output publish --configuration Release
+```

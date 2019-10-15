@@ -30,9 +30,9 @@ git clone https://github.com/tangramproject/Tangram.Vector
 ```
 cd VectorContainers  
 dotnet restore VectorContainers.sln
-dotnet publish TGMGateway --output publish --configuration Release  
-dotnet publish Coin.API --output publish --configuration Release
-dotnet publish MessagePool.API --output publish --configuration Release
-dotnet publish Onion.API --output publish --configuration Release
-dotnet publish Membeship.API --output publish --configuration Release
+dotnet publish TGMGateway --output TGMGateway/publish --configuration Release  
+dotnet publish Coin.API --output Coin.API/publish --configuration Release
+dotnet publish MessagePool.API --output MessagePool.API/publish --configuration Release
+dotnet publish Onion.API --output Onion.API/publish --configuration Release
+dotnet publish Membeship.API --output Membeship.API/publish --configuration Release
 ```

@@ -48,25 +48,43 @@ namespace Coin.API.Providers
 
                 logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Local node block height ({local}). Network block height ({network}).");
 
+                var downloads = Enumerable.Empty<KeyValuePair<ulong, int>>();
+
                 if (local < network)
                 {
                     var numberOfBlocks = Difference(local, network);
 
                     logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Synchronizing node. Total blocks behind ({numberOfBlocks})");
 
-                    var downloads = await Synchronize(numberOfBlocks);
+                    downloads = await Synchronize(numberOfBlocks);
+                }
 
-                    var total = (ulong) downloads.Sum(v => v.Value);
-                    if (total.Equals(network))
-                    {
-                        unitOfWork.Interpreted.Store(network, network);
-                        blockGraphService.SetSynchronized(true);
-                    }
+                if (downloads.Any() != true)
+                {
+                    blockGraphService.SetSynchronized(true);
+                    unitOfWork.Interpreted.Store(local, local);
 
                     return;
                 }
 
-                blockGraphService.SetSynchronized(true);
+                //TODO Needs fixing...
+                ///     var total = (ulong) downloads.Sum(v => v.Value);
+                ///
+
+                (local, network) = await Height();
+
+                if (local.Equals(network))
+                {
+                    blockGraphService.SetSynchronized(true);
+                    unitOfWork.Interpreted.Store(network, network);
+
+                    return;
+                }
+
+
+                blockGraphService.SetSynchronized(false);
+                logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Synchronizing node failed. Number of downloads {downloads.Count()} Expected Network block height ({network}");
+
             }
             catch (Exception ex)
             {

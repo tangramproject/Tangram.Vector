@@ -44,46 +44,37 @@ namespace Coin.API.Providers
             {
                 logger.LogInformation("<<< SyncProvider.SynchronizeCheck >>>: Checking block height.");
 
+                ulong total;
+
                 var (local, network) = await Height();
+                var numberOfBlocks = Difference(local, network);
 
                 logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Local node block height ({local}). Network block height ({network}).");
 
-                var downloads = Enumerable.Empty<KeyValuePair<ulong, int>>();
-
                 if (local < network)
                 {
-                    var numberOfBlocks = Difference(local, network);
-
                     logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Synchronizing node. Total blocks behind ({numberOfBlocks})");
 
-                    downloads = await Synchronize(numberOfBlocks);
+                    var downloads = await Synchronize(numberOfBlocks);
+                    if (downloads.Any() != true)
+                    {
+                        blockGraphService.SetSynchronized(false);
+                        logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Synchronizing node failed. Number of blocks reached {local + (ulong)downloads.Count()} Expected Network block height ({network}");
+                        return;
+                    }
+
+                    var sum = (ulong)downloads.Sum(v => v.Value);
+                    if (!sum.Equals(numberOfBlocks))
+                    {
+                        blockGraphService.SetSynchronized(false);
+                        return;
+                    }
+
+                    total = local + sum;
+                    unitOfWork.Interpreted.Store(total, total);
                 }
 
-                if (downloads.Any() != true)
-                {
-                    blockGraphService.SetSynchronized(true);
-                    unitOfWork.Interpreted.Store(local, local);
-
-                    return;
-                }
-
-                //TODO Needs fixing...
-                ///   var total = (ulong) downloads.Sum(v => v.Value);
-
-                (local, network) = await Height();
-
-                if (local.Equals(network))
-                {
-                    blockGraphService.SetSynchronized(true);
-                    unitOfWork.Interpreted.Store(network, network);
-
-                    return;
-                }
-
-
-                blockGraphService.SetSynchronized(false);
-                logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Synchronizing node failed. Number of downloads {downloads.Count()} Expected Network block height ({network}");
-
+                blockGraphService.SetSynchronized(true);
             }
             catch (Exception ex)
             {
@@ -116,48 +107,45 @@ namespace Coin.API.Providers
                 var allTasks = new List<Task>();
                 var numberOfBatches = (int)Math.Ceiling((double)numberOfBlocks / numberOfBlocks);
 
-                foreach (var member in httpService.Members)
+                var series = new long[numberOfBatches];
+                foreach (var n in series)
                 {
-                    var series = new long[numberOfBatches];
-                    foreach (var n in series)
+                    await throttler.WaitAsync();
+
+                    allTasks.Add(Task.Run(async () =>
                     {
-                        await throttler.WaitAsync();
-
-                        allTasks.Add(Task.Run(async () =>
+                        try
                         {
-                            try
+                            var uri = new Uri(new Uri(RandomizedIP().Value), $"coins/{n * (long)numberOfBlocks}/{numberOfBlocks}");
+                            var response = await torClient.GetAsync(uri, new CancellationToken());
+                            var read = response.Content.ReadAsStringAsync().Result;
+                            var jObject = JObject.Parse(read);
+                            var jToken = jObject.GetValue("protobufs");
+                            var byteArray = Convert.FromBase64String(jToken.Value<string>());
+                            var blockIdProtos = Util.DeserializeListProto<BlockIDProto>(byteArray);
+
+                            logger.LogInformation($"<<< Synchronize >>>: Retrieved {byteArray.Length} bytes from {uri.Host}");
+
+                            var scheme = response.RequestMessage.RequestUri.Scheme;
+                            var authority = response.RequestMessage.RequestUri.Authority;
+                            var identity = httpService.Members.FirstOrDefault(k => k.Value.Equals($"{scheme}://{authority}"));
+
+                            if (byteArray.Length > 0)
                             {
-                                var uri = new Uri(new Uri(member.Value), $"coins/{n * (long)numberOfBlocks}/{numberOfBlocks}");
-                                var response = await torClient.GetAsync(uri, new CancellationToken());
-                                var read = response.Content.ReadAsStringAsync().Result;
-                                var jObject = JObject.Parse(read);
-                                var jToken = jObject.GetValue("protobufs");
-                                var byteArray = Convert.FromBase64String(jToken.Value<string>());
-                                var blockIdProtos = Util.DeserializeListProto<BlockIDProto>(byteArray);
+                                var blockIDs = blockIdProtos.Select(x => new Core.API.Consensus.BlockID(x.Hash, x.Node, x.Round, x.SignedBlock)).AsEnumerable();
+                                var success = await blockGraphService.InterpretBlocks(blockIDs);
 
-                                logger.LogInformation($"<<< Synchronize >>>: Retrieved {byteArray.Length} bytes from {uri.Host}");
-
-                                var scheme = response.RequestMessage.RequestUri.Scheme;
-                                var authority = response.RequestMessage.RequestUri.Authority;
-                                var identity = httpService.Members.FirstOrDefault(k => k.Value.Equals($"{scheme}://{authority}"));
-
-                                if (byteArray.Length > 0)
-                                {
-                                    var blockIDs = blockIdProtos.Select(x => new Core.API.Consensus.BlockID(x.Hash, x.Node, x.Round, x.SignedBlock)).AsEnumerable();
-                                    var success = await blockGraphService.InterpretBlocks(blockIDs);
-
-                                    downloads.TryAdd(identity.Key, blockIDs.Count());
-                                    return;
-                                }
-
-                                downloads.TryAdd(identity.Key, 0);
+                                downloads.TryAdd(identity.Key, blockIDs.Count());
+                                return;
                             }
-                            finally
-                            {
-                                throttler.Release();
-                            }
-                        }));
-                    }
+
+                            downloads.TryAdd(identity.Key, 0);
+                        }
+                        finally
+                        {
+                            throttler.Release();
+                        }
+                    }));
                 }
 
                 try
@@ -200,5 +188,18 @@ namespace Coin.API.Providers
         {
             return network > local ? network - local : local - network;
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private KeyValuePair<ulong, string> RandomizedIP()
+        {
+            var random = new Random();
+            var pos = random.Next(httpService.Members.Count);
+
+            return httpService.Members.ElementAt(pos);
+        }
+
     }
 }

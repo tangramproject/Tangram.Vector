@@ -183,6 +183,18 @@ namespace Coin.API.Services
         /// <summary>
         /// 
         /// </summary>
+        /// <returns></returns>
+        public KeyValuePair<ulong, string> RandomizedIP()
+        {
+            var random = new Random();
+            var pos = random.Next(Members.Count);
+
+            return Members.ElementAt(pos);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="stoppingToken"></param>
         private void MaintainMembers(CancellationToken stoppingToken)
         {

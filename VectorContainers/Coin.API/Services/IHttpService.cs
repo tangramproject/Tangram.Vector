@@ -17,5 +17,6 @@ namespace Coin.API.Services
         string GetHostName();
         Task<byte[]> GetPublicKey();
         Task<List<KeyValuePair<ulong, string>>> GetMemberIdentities();
+        KeyValuePair<ulong, string> RandomizedIP();
    }
 }

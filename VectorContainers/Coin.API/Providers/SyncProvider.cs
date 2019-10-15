@@ -44,8 +44,6 @@ namespace Coin.API.Providers
             {
                 logger.LogInformation("<<< SyncProvider.SynchronizeCheck >>>: Checking block height.");
 
-                ulong total;
-
                 var (local, network) = await Height();
                 var numberOfBlocks = Difference(local, network);
 
@@ -70,7 +68,7 @@ namespace Coin.API.Providers
                         return;
                     }
 
-                    total = local + sum;
+                    var total = local + sum;
                     unitOfWork.Interpreted.Store(total, total);
                 }
 
@@ -116,7 +114,7 @@ namespace Coin.API.Providers
                     {
                         try
                         {
-                            var uri = new Uri(new Uri(RandomizedIP().Value), $"coins/{n * (long)numberOfBlocks}/{numberOfBlocks}");
+                            var uri = new Uri(new Uri(httpService.RandomizedIP().Value), $"coins/{n * (long)numberOfBlocks}/{numberOfBlocks}");
                             var response = await torClient.GetAsync(uri, new CancellationToken());
                             var read = response.Content.ReadAsStringAsync().Result;
                             var jObject = JObject.Parse(read);
@@ -188,18 +186,5 @@ namespace Coin.API.Providers
         {
             return network > local ? network - local : local - network;
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        private KeyValuePair<ulong, string> RandomizedIP()
-        {
-            var random = new Random();
-            var pos = random.Next(httpService.Members.Count);
-
-            return httpService.Members.ElementAt(pos);
-        }
-
     }
 }

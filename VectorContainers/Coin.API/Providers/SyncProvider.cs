@@ -68,7 +68,7 @@ namespace Coin.API.Providers
                 }
 
                 //TODO Needs fixing...
-                /// var total = (ulong) downloads.Sum(v => v.Value);
+                ///   var total = (ulong) downloads.Sum(v => v.Value);
 
                 (local, network) = await Height();
 

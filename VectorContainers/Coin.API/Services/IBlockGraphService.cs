@@ -15,6 +15,7 @@ namespace Coin.API.Services
         bool VerifiyHashChain(CoinProto previous, CoinProto next);
         Task<int> BlockHeight();
         Task<long> NetworkBlockHeight();
+        Task<IEnumerable<NodeBlockCountProto>> FullNetworkBlockHeight();
         Task<bool> InterpretBlocks(IEnumerable<BlockID> blocks);
     }
 }

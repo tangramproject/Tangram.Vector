@@ -190,20 +190,13 @@ namespace Coin.API.Services
         public async Task<long> NetworkBlockHeight()
         {
             long height = 0;
-            List<long> list = new List<long>();
 
             try
             {
-                var responses = await httpService.Dial(DialType.Get, "height");
-                foreach (var response in responses)
-                {
-                    var jToken = Util.ReadJToken(response, "height");
-                    list.Add(jToken.Value<long>());
-                }
-
+                var list = await FullNetworkBlockHeight();
                 if (list.Any())
                 {
-                    height = list.Max();
+                    height = list.Max(m => m.BlockCount);
                 }
             }
             catch (Exception ex)
@@ -212,6 +205,36 @@ namespace Coin.API.Services
             }
 
             return height;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public async Task<IEnumerable<NodeBlockCountProto>> FullNetworkBlockHeight()
+        {
+            var list = new List<NodeBlockCountProto>();
+
+            try
+            {
+                var responses = await httpService.Dial(DialType.Get, "height");
+                foreach (var response in responses)
+                {
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var fullNodeIdentity = httpService.GetFullNodeIdentity(response);
+
+                        var jToken = Util.ReadJToken(response, "height");
+                        list.Add(new NodeBlockCountProto { Address = fullNodeIdentity.Value, BlockCount = jToken.Value<long>(), Node = fullNodeIdentity.Key });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< BlockGraphService.FullNetworkBlockHeight >>>: {ex.ToString()}");
+            }
+
+            return list;
         }
 
         /// <summary>

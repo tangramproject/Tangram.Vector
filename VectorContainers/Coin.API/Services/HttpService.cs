@@ -77,7 +77,7 @@ namespace Coin.API.Services
             try
             {
                 hostName = onionServiceClient.GetHiddenServiceDetailsAsync().GetAwaiter().GetResult().Hostname;
-                hostName = hostName.Substring(0, hostName.Length - 6);
+                hostName = hostName[0..^6];
             }
             catch (Exception ex)
             {
@@ -109,6 +109,31 @@ namespace Coin.API.Services
             return publicKey;
         }
 
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dialType"></param>
+        /// <param name="address"></param>
+        /// <param name="directory"></param>
+        /// <returns></returns>
+        public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string address, string directory)
+        {
+            return await Dial(dialType, new string[] { address }, directory, null, null);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dialType"></param>
+        /// <param name="addresses"></param>
+        /// <param name="directory"></param>
+        /// <returns></returns>
+        public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, IEnumerable<string> addresses, string directory)
+        {
+            return await Dial(dialType, addresses, directory, null, null);
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -117,7 +142,7 @@ namespace Coin.API.Services
         /// <returns></returns>
         public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory)
         {
-            return await Dial(dialType, directory, null, null);
+            return await Dial(dialType, await GetMembers(), directory, null, null);
         }
 
         /// <summary>
@@ -129,7 +154,7 @@ namespace Coin.API.Services
         /// <returns></returns>
         public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory, object payload)
         {
-            return await Dial(dialType, directory, payload, null);
+            return await Dial(dialType, await GetMembers(), directory, payload, null);
         }
 
         /// <summary>
@@ -141,7 +166,7 @@ namespace Coin.API.Services
         /// <returns></returns>
         public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory, string[] args)
         {
-            return await Dial(dialType, directory, null, args);
+            return await Dial(dialType, await GetMembers(), directory, null, args);
         }
 
         /// <summary>
@@ -183,13 +208,15 @@ namespace Coin.API.Services
         /// <summary>
         /// 
         /// </summary>
+        /// <param name="response"></param>
         /// <returns></returns>
-        public KeyValuePair<ulong, string> RandomizedIP()
+        public KeyValuePair<ulong, string> GetFullNodeIdentity(HttpResponseMessage response)
         {
-            var random = new Random();
-            var pos = random.Next(Members.Count);
+            var scheme = response.RequestMessage.RequestUri.Scheme;
+            var authority = response.RequestMessage.RequestUri.Authority;
+            var identity = Members.FirstOrDefault(k => k.Value.Equals($"{scheme}://{authority}"));
 
-            return Members.ElementAt(pos);
+            return identity;
         }
 
         /// <summary>
@@ -230,15 +257,14 @@ namespace Coin.API.Services
         /// <param name="directory"></param>
         /// <param name="args"></param>
         /// <returns></returns>
-        private async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory, object payload, string[] args)
+        private async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, IEnumerable<string> addresses, string directory, object payload, string[] args)
         {
             var dialTasks = new List<Task<HttpResponseMessage>>();
             var responseTasks = new List<Task<HttpResponseMessage>>();
 
             try
             {
-                var members = await GetMembers();
-                foreach (var member in members)
+                foreach (var address in addresses)
                 {
                     dialTasks.Add(Task.Run(() =>
                     {
@@ -251,7 +277,7 @@ namespace Coin.API.Services
 
                         Task<HttpResponseMessage> response = null;
 
-                        var uri = new Uri(new Uri(member), path);
+                        var uri = new Uri(new Uri(address), path);
 
                         response = dialType switch
                         {

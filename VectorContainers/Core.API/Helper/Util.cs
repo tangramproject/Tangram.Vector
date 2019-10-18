@@ -7,10 +7,8 @@ using System.Security;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 using System.Numerics;
-using System.IO.Compression;
 using ProtoBuf;
 using Core.API.LibSodium;
-using Core.API.Model;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -21,6 +19,8 @@ namespace Core.API.Helper
     public static class Util
     {
         public const string hexUpper = "0123456789ABCDEF";
+
+        internal static Random _Random = new Random();
 
         public static byte[] GetZeroBytes()
         {
@@ -269,6 +269,18 @@ namespace Core.API.Helper
             var jToken = jObject.GetValue(attr);
 
             return jToken;
+        }
+
+        public static void Shuffle<T>(T[] array)
+        {
+            int n = array.Length;
+            for (int i = 0; i < n; i++)
+            {
+                int r = i + _Random.Next(n - i);
+                T t = array[r];
+                array[r] = array[i];
+                array[i] = t;
+            }
         }
     }
 }

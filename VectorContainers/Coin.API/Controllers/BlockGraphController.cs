@@ -179,5 +179,27 @@ namespace Coin.API.Controllers
 
             return new StatusCodeResult(StatusCodes.Status500InternalServerError);
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("interpreted", Name = "Interpreted")]
+        [ProducesResponseType(typeof(byte[]), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Interpreted()
+        {
+            try
+            {
+                var interpreted = await unitOfWork.Interpreted.Get();
+                return new ObjectResult(new { interpreted = Util.SerializeProto(interpreted) });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Interpreted - Controller >>>: {ex.ToString()}");
+            }
+
+            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+        }
     }
 }

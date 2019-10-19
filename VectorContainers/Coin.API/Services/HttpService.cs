@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Coin.API.Providers;
 using Core.API.Helper;
 using Core.API.Membership;
 using Core.API.Onion;
@@ -26,13 +27,16 @@ namespace Coin.API.Services
         public string GatewayUrl { get; private set; }
         public ConcurrentDictionary<ulong, string> Members { get; private set; }
 
+        private readonly NetworkProvider networkProvider;
         private readonly IMembershipServiceClient membershipServiceClient;
         private readonly IOnionServiceClient onionServiceClient;
         private readonly ITorClient torClient;
         private readonly ILogger logger;
 
-        public HttpService(IMembershipServiceClient membershipServiceClient, IOnionServiceClient onionServiceClient, ITorClient torClient, IConfiguration configuration, ILogger<HttpService> logger)
+        public HttpService(NetworkProvider networkProvider, IMembershipServiceClient membershipServiceClient, IOnionServiceClient onionServiceClient,
+            ITorClient torClient, IConfiguration configuration, ILogger<HttpService> logger)
         {
+            this.networkProvider = networkProvider;
             this.membershipServiceClient = membershipServiceClient;
             this.onionServiceClient = onionServiceClient;
             this.torClient = torClient;
@@ -65,6 +69,15 @@ namespace Coin.API.Services
             }
 
             return members;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public NetworkProvider GetNetworkProvider()
+        {
+            return networkProvider;
         }
 
         /// <summary>
@@ -109,6 +122,16 @@ namespace Coin.API.Services
             return publicKey;
         }
 
+        /// <summary>
+        /// Post
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="payload"></param>
+        /// <returns></returns>
+        public async Task<HttpResponseMessage> Dial(string address, object payload)
+        {
+            return (await Dial(DialType.Post, new string[] { address }, null, payload, null)).FirstOrDefault();
+        }
 
         /// <summary>
         /// 
@@ -117,9 +140,9 @@ namespace Coin.API.Services
         /// <param name="address"></param>
         /// <param name="directory"></param>
         /// <returns></returns>
-        public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string address, string directory)
+        public async Task<HttpResponseMessage> Dial(DialType dialType, string address, string directory)
         {
-            return await Dial(dialType, new string[] { address }, directory, null, null);
+            return (await Dial(dialType, new string[] { address }, directory, null, null)).FirstOrDefault();
         }
 
         /// <summary>

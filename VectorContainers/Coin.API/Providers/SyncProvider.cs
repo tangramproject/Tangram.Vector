@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
-using Core.API.Onion;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -21,18 +20,13 @@ namespace Coin.API.Providers
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
         private readonly InterpretBlocksProvider interpretBlocksProvider;
-        private readonly NetworkProvider networkProvider;
-        private readonly ITorClient torClient;
         private readonly ILogger logger;
 
-        public SyncProvider(IUnitOfWork unitOfWork, IHttpService httpService, InterpretBlocksProvider interpretBlocksProvider,
-            NetworkProvider networkProvider, ITorClient torClient, ILogger<SyncProvider> logger)
+        public SyncProvider(IUnitOfWork unitOfWork, IHttpService httpService, InterpretBlocksProvider interpretBlocksProvider, ILogger<SyncProvider> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
             this.interpretBlocksProvider = interpretBlocksProvider;
-            this.networkProvider = networkProvider;
-            this.torClient = torClient;
             this.logger = logger;
         }
 
@@ -112,15 +106,14 @@ namespace Coin.API.Providers
                         {
                             Util.Shuffle(pool.ToArray());
 
-                            var uri = new Uri(new Uri(pool.First().Address), $"coins/{n * (long)numberOfBlocks}/{numberOfBlocks}");
-                            var response = await torClient.GetAsync(uri, new CancellationToken());
+                            var response = await httpService.Dial(DialType.Get, pool.First().Address, $"coins/{n * (long)numberOfBlocks}/{numberOfBlocks}");
                             var read = response.Content.ReadAsStringAsync().Result;
                             var jObject = JObject.Parse(read);
                             var jToken = jObject.GetValue("protobufs");
                             var byteArray = Convert.FromBase64String(jToken.Value<string>());
                             var blockIdProtos = Util.DeserializeListProto<BlockIDProto>(byteArray);
 
-                            logger.LogInformation($"<<< Synchronize >>>: Retrieved {byteArray.Length} bytes from {uri.Host}");
+                            logger.LogInformation($"<<< Synchronize >>>: Retrieved {byteArray.Length} bytes from {response.RequestMessage.RequestUri.Authority}");
 
                             var fullIdentity = httpService.GetFullNodeIdentity(response);
 
@@ -211,8 +204,8 @@ namespace Coin.API.Providers
         /// <returns></returns>
         private async Task<(ulong local, IEnumerable<NodeBlockCountProto> network)> Height()
         {
-            var l = (ulong)await networkProvider.BlockHeight();
-            var n = await networkProvider.FullNetworkBlockHeight();
+            var l = (ulong)await httpService.GetNetworkProvider().BlockHeight();
+            var n = await httpService.GetNetworkProvider().FullNetworkBlockHeight();
 
             return (l, n);
         }

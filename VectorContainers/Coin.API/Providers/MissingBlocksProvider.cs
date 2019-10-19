@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
-using Core.API.Onion;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -20,14 +19,12 @@ namespace Coin.API.Providers
 
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
-        private readonly ITorClient torClient;
         private readonly ILogger logger;
 
-        public MissingBlocksProvider(IUnitOfWork unitOfWork, IHttpService httpService, ITorClient torClient, ILogger<MissingBlocksProvider> logger)
+        public MissingBlocksProvider(IUnitOfWork unitOfWork, IHttpService httpService, ILogger<MissingBlocksProvider> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
-            this.torClient = torClient;
             this.logger = logger;
         }
 
@@ -79,13 +76,11 @@ namespace Coin.API.Providers
 
                 foreach (var member in httpService.Members)
                 {
-                    var uri = new Uri(new Uri(member.Value), $"mempool/{job.BlockGraph.Block.Hash}/{job.BlockGraph.Block.Round}");
-
                     allTasks.Add(Task.Run(async () =>
                     {
                         HttpResponseMessage response = null;
 
-                        response = await torClient.GetAsync(uri, new CancellationToken());
+                        response = await httpService.Dial(DialType.Get, member.Value, $"mempool/{job.BlockGraph.Block.Hash}/{job.BlockGraph.Block.Round}");
                         response.EnsureSuccessStatusCode();
 
                         var jToken = Util.ReadJToken(response, "protobuf");
@@ -133,7 +128,8 @@ namespace Coin.API.Providers
             try
             {
                 var payload = blocks.Select(k => k.Value);
-                var response = await torClient.PostAsJsonAsync($"{httpService.GatewayUrl}/blockgraphs", Util.SerializeProto(payload));
+
+                var response = await httpService.Dial($"{httpService.GatewayUrl}/blockgraphs", Util.SerializeProto(payload));
                 if (response.IsSuccessStatusCode)
                 {
                     var jToken = Util.ReadJToken(response, "protobufs");

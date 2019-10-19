@@ -7,7 +7,6 @@ using Coin.API.Providers;
 using Core.API.Consensus;
 using Core.API.Helper;
 using Core.API.Model;
-using Core.API.Onion;
 using Microsoft.Extensions.Logging;
 
 namespace Coin.API.Services
@@ -25,7 +24,6 @@ namespace Coin.API.Services
 
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
-        private readonly ITorClient torClient;
         private readonly ILogger logger;
 
         private readonly HierarchicalDataProvider dataProvider;
@@ -37,14 +35,13 @@ namespace Coin.API.Services
         private ulong round;
 
         public BlockGraphService(IUnitOfWork unitOfWork, IHttpService httpService, HierarchicalDataProvider dataProvider, SigningProvider signingProvider,
-            InterpretBlocksProvider interpretBlocksProvider, ITorClient torClient, ILogger<BlockGraphService> logger)
+            InterpretBlocksProvider interpretBlocksProvider, ILogger<BlockGraphService> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
             this.dataProvider = dataProvider;
             this.signingProvider = signingProvider;
             this.interpretBlocksProvider = interpretBlocksProvider;
-            this.torClient = torClient;
             this.logger = logger;
 
             Start().GetAwaiter();

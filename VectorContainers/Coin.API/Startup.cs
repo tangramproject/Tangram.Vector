@@ -76,9 +76,9 @@ namespace Coin.API
 
             services.AddOptions();
 
-            services.AddSingleton<InterpretBlocksProvider>();
-            services.AddSingleton<NetworkProvider>();
-            services.AddSingleton<SigningProvider>();
+            services.AddTransient<InterpretBlocksProvider>();
+            services.AddTransient<NetworkProvider>();
+            services.AddTransient<SigningProvider>();
 
             services.AddSingleton<SyncProvider>();
             services.AddHostedService<SyncService>();

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
-using Core.API.Onion;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -15,21 +14,19 @@ namespace Coin.API.Providers
 {
     public class ReplyProvider
     {
-        private static readonly AsyncLock markAsMutex = new AsyncLock();
+        private static readonly AsyncLock markStatesAsMutex = new AsyncLock();
+        private static readonly AsyncLock markRepliesAsMutex = new AsyncLock();
 
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
         private readonly SigningProvider signingProvider;
-        private readonly ITorClient torClient;
         private readonly ILogger logger;
 
-        public ReplyProvider(IUnitOfWork unitOfWork, IHttpService httpService, SigningProvider signingProvider,
-            ITorClient torClient, ILogger<ReplyProvider> logger)
+        public ReplyProvider(IUnitOfWork unitOfWork, IHttpService httpService, SigningProvider signingProvider, ILogger<ReplyProvider> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
             this.signingProvider = signingProvider;
-            this.torClient = torClient;
             this.logger = logger;
         }
 
@@ -242,11 +239,11 @@ namespace Coin.API.Providers
 
                 foreach (var member in httpService.Members)
                 {
+                    await throttler.WaitAsync();
+
                     var series = new long[numberOfBatches];
                     foreach (var n in series)
                     {
-                        await throttler.WaitAsync();
-
                         var batch = blockGraphs.Skip((int)(n * numberOfBlocks)).Take(numberOfBlocks);
                         if (batch.Any() != true)
                         {
@@ -293,7 +290,7 @@ namespace Coin.API.Providers
                     var currentBlockGraphs = Util.SerializeProto(sending);
                     var uri = new Uri(new Uri(member), "blockgraphs");
 
-                    response = await torClient.PostAsJsonAsync(uri, currentBlockGraphs);
+                    response = await httpService.Dial(uri.AbsolutePath, currentBlockGraphs);
                     response.EnsureSuccessStatusCode();
 
                     var jToken = Util.ReadJToken(response, "protobufs");
@@ -341,7 +338,7 @@ namespace Coin.API.Providers
 
             try
             {
-                using (await markAsMutex.LockAsync())
+                using (await markStatesAsMutex.LockAsync())
                 {
                     if (blockInfos.Any() != true)
                     {
@@ -389,7 +386,7 @@ namespace Coin.API.Providers
 
             try
             {
-                using (await markAsMutex.LockAsync())
+                using (await markRepliesAsMutex.LockAsync())
                 {
                     if (blockInfos.Any() != true)
                     {

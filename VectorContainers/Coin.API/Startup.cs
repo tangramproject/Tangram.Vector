@@ -15,6 +15,7 @@ using System.Net.Http;
 using Coin.API.Middlewares;
 using Core.API.Model;
 using Coin.API.Providers;
+using System.Threading;
 
 namespace Coin.API
 {
@@ -157,7 +158,28 @@ namespace Coin.API
 
             services.AddTransient<IMembershipServiceClient, MembershipServiceClient>();
 
-            services.AddSingleton<IBlockGraphService, BlockGraphService>();
+            services.AddSingleton<IBlockGraphService, BlockGraphService>(sp =>
+            {
+                var logger = sp.GetService<ILogger<Startup>>();
+                var syncProvider = sp.GetService<SyncProvider>();
+
+                while (syncProvider.IsRunning)
+                {
+                    logger.LogInformation("Syncing node... retrying in a few seconds");
+                    Thread.Sleep(5000);
+                }
+
+                var blockGraphService = new BlockGraphService(
+                    sp.GetService<IUnitOfWork>(),
+                    sp.GetService<IHttpService>(),
+                    sp.GetService<HierarchicalDataProvider>(),
+                    sp.GetService<SigningProvider>(),
+                    sp.GetService<ITorClient>(),
+                    sp.GetService<ILogger<BlockGraphService>>());
+
+                return blockGraphService;
+
+            });
 
             services.AddTransient<ICoinService, CoinService>();
         }

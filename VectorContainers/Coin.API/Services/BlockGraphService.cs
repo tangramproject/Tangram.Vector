@@ -68,11 +68,6 @@ namespace Coin.API.Services
                 logger.LogWarning($"<<< Initialize >>>: Minimum number of nodes required (4). Total number of nodes ({totalNodes})");
             }
 
-            while (!IsSynchronized)
-            {
-                await Task.Delay(1000);
-            }
-
             lastInterpreted = await unitOfWork.Interpreted.GetRound();
             lastInterpreted = lastInterpreted > 0 ? lastInterpreted - 1 : lastInterpreted;
 

@@ -49,7 +49,7 @@ namespace Coin.API.Providers
                 var numberOfBlocks = Difference(local, maxNetworkHeight);
                 var maxNetworks = network.Where(x => x.BlockCount == (long)maxNetworkHeight);
 
-                logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Local node block height ({local}). Network block height ({network}).");
+                logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Local node block height ({local}). Network block height ({maxNetworks}).");
 
                 if (local < maxNetworkHeight)
                 {
@@ -59,7 +59,7 @@ namespace Coin.API.Providers
                     if (downloads.Any() != true)
                     {
                         blockGraphService.SetSynchronized(false);
-                        logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Failed to synchronize node. Number of blocks reached {local + (ulong)downloads.Count()} Expected Network block height ({network}");
+                        logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Failed to synchronize node. Number of blocks reached {local + (ulong)downloads.Count()} Expected Network block height ({maxNetworks}");
                         return;
                     }
 

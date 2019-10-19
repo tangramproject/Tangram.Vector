@@ -177,7 +177,6 @@ namespace Coin.API
                     sp.GetService<HierarchicalDataProvider>(),
                     sp.GetService<SigningProvider>(),
                     sp.GetService<InterpretBlocksProvider>(),
-                    sp.GetService<ITorClient>(),
                     sp.GetService<ILogger<BlockGraphService>>());
 
                 return blockGraphService;

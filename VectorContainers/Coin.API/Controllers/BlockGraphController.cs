@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Coin.API.Providers;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
@@ -17,13 +18,16 @@ namespace Coin.API.Controllers
         private readonly IBlockGraphService blockGraphService;
         private readonly IHttpService httpService;
         private readonly IUnitOfWork unitOfWork;
+        private readonly NetworkProvider networkProvider;
         private readonly ILogger logger;
 
-        public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService, IUnitOfWork unitOfWork, ILogger<BlockGraphController> logger)
+        public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService, IUnitOfWork unitOfWork,
+            NetworkProvider networkProvider, ILogger<BlockGraphController> logger)
         {
             this.blockGraphService = blockGraphService;
             this.httpService = httpService;
             this.unitOfWork = unitOfWork;
+            this.networkProvider = networkProvider;
             this.logger = logger;
         }
 
@@ -101,7 +105,7 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockHeight = await blockGraphService.BlockHeight();
+                var blockHeight = await networkProvider.BlockHeight();
                 return new ObjectResult(new { height = blockHeight });
             }
             catch (Exception ex)
@@ -123,7 +127,7 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockHeight = await blockGraphService.NetworkBlockHeight();
+                var blockHeight = await networkProvider.NetworkBlockHeight();
                 return new ObjectResult(new { height = blockHeight });
             }
             catch (Exception ex)

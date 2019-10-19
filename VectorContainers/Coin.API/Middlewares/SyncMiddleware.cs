@@ -19,7 +19,7 @@ namespace Coin.API.Middlewares
         {
             httpContext.Response.OnStarting(async state =>
             {
-                if (!syncProvider.GetIsSynchronized())
+                if (!syncProvider.IsSynchronized)
                 {
                     var httpContext = (HttpContext)state;
                     var paths = new string[] { "blockgraph", "blockgraphs", "mempool", "Coin" };

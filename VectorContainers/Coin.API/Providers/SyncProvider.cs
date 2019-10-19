@@ -16,18 +16,22 @@ namespace Coin.API.Providers
     public class SyncProvider
     {
         public bool IsRunning { get; private set; }
+        public bool IsSynchronized { get; private set; }
 
-        private readonly IBlockGraphService blockGraphService;
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
+        private readonly InterpretBlocksProvider interpretBlocksProvider;
+        private readonly NetworkProvider networkProvider;
         private readonly ITorClient torClient;
         private readonly ILogger logger;
 
-        public SyncProvider(IBlockGraphService blockGraphService, IUnitOfWork unitOfWork, IHttpService httpService, ITorClient torClient, ILogger<SyncProvider> logger)
+        public SyncProvider(IUnitOfWork unitOfWork, IHttpService httpService, InterpretBlocksProvider interpretBlocksProvider,
+            NetworkProvider networkProvider, ITorClient torClient, ILogger<SyncProvider> logger)
         {
-            this.blockGraphService = blockGraphService;
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
+            this.interpretBlocksProvider = interpretBlocksProvider;
+            this.networkProvider = networkProvider;
             this.torClient = torClient;
             this.logger = logger;
         }
@@ -58,7 +62,7 @@ namespace Coin.API.Providers
                     var downloads = await Synchronize(maxNetworks, numberOfBlocks);
                     if (downloads.Any() != true)
                     {
-                        blockGraphService.SetSynchronized(false);
+                        IsSynchronized = false;
                         logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Failed to synchronize node. Number of blocks reached {local + (ulong)downloads.Count()} Expected Network block height ({maxNetworks}");
                         return;
                     }
@@ -66,14 +70,14 @@ namespace Coin.API.Providers
                     var sum = (ulong)downloads.Sum(v => v.Value);
                     if (!sum.Equals(numberOfBlocks))
                     {
-                        blockGraphService.SetSynchronized(false);
+                        IsSynchronized = false;
                         return;
                     }
 
                     await SetInterpreted(maxNetworks.ToArray());
                 }
 
-                blockGraphService.SetSynchronized(true);
+                IsSynchronized = true;
             }
             catch (Exception ex)
             {
@@ -81,15 +85,6 @@ namespace Coin.API.Providers
             }
 
             IsRunning = false;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public bool GetIsSynchronized()
-        {
-            return blockGraphService.IsSynchronized;
         }
 
         /// <summary>
@@ -132,7 +127,7 @@ namespace Coin.API.Providers
                             if (byteArray.Length > 0)
                             {
                                 var blockIDs = blockIdProtos.Select(x => new Core.API.Consensus.BlockID(x.Hash, x.Node, x.Round, x.SignedBlock)).AsEnumerable();
-                                var success = await blockGraphService.InterpretBlocks(blockIDs);
+                                var success = await interpretBlocksProvider.Interpret(blockIDs);
 
                                 downloads.TryAdd(fullIdentity.Key, blockIDs.Count());
                                 return;
@@ -216,8 +211,8 @@ namespace Coin.API.Providers
         /// <returns></returns>
         private async Task<(ulong local, IEnumerable<NodeBlockCountProto> network)> Height()
         {
-            var l = (ulong)await blockGraphService.BlockHeight();
-            var n = await blockGraphService.FullNetworkBlockHeight();
+            var l = (ulong)await networkProvider.BlockHeight();
+            var n = await networkProvider.FullNetworkBlockHeight();
 
             return (l, n);
         }

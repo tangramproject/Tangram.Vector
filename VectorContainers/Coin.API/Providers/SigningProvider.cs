@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Core.API.Helper;
 using Core.API.LibSodium;
 using Core.API.Model;
 using Core.API.Onion;
+using Core.API.Signatures;
 using Microsoft.Extensions.Logging;
+using Secp256k1_ZKP.Net;
 
 namespace Coin.API.Providers
 {
@@ -130,6 +133,99 @@ namespace Coin.API.Providers
             }
 
             return hash;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="coin"></param>
+        /// <returns></returns>
+        public bool ValidateRule(CoinProto coin)
+        {
+            if (coin == null)
+                throw new ArgumentNullException(nameof(coin));
+
+            var coinHasElements = coin.Validate().Any();
+            if (!coinHasElements)
+            {
+                try
+                {
+                    using var secp256k1 = new Secp256k1();
+                    using var bulletProof = new BulletProof();
+
+                    var success = bulletProof.Verify(coin.Commitment.FromHex(), coin.RangeProof.FromHex(), null);
+                    if (!success)
+                        return false;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"<<< BlockGraphService.ValidateRule >>>: {ex.ToString()}");
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="blockIDProto"></param>
+        /// <returns></returns>
+        public bool VerifiySignature(BlockIDProto blockIDProto)
+        {
+            if (blockIDProto == null)
+                throw new ArgumentNullException(nameof(blockIDProto));
+
+            bool result = false;
+
+            try
+            {
+                var signedBlock = blockIDProto.SignedBlock;
+                var blockHash = BlockHash(signedBlock.Coin.Stamp, blockIDProto.Node, blockIDProto.Round, signedBlock.PublicKey);
+                var coinHash = HashCoin(signedBlock.Coin, signedBlock.PublicKey);
+                var combinedHash = Util.Combine(blockHash, coinHash);
+
+                result = Ed25519.Verify(signedBlock.Signature.FromHex(), combinedHash, signedBlock.PublicKey.FromHex());
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< BlockGraphService.VerifiySignature >>>: {ex.ToString()}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Verifiies the coin chain.
+        /// </summary>
+        /// <returns><c>true</c>, if coin chain was verifiyed, <c>false</c> otherwise.</returns>
+        /// <param name="previous">Previous coin</param>
+        /// <param name="next">Next coin.</param>
+        public bool VerifiyHashChain(CoinProto previous, CoinProto next)
+        {
+            if (previous == null)
+                throw new ArgumentNullException(nameof(previous));
+
+            if (next == null)
+                throw new ArgumentNullException(nameof(next));
+
+            bool validH = false, validK = false;
+
+            try
+            {
+                var hint = Cryptography.GenericHashNoKey($"{next.Version} {next.Stamp} {next.Principle}").ToHex();
+                var keeper = Cryptography.GenericHashNoKey($"{next.Version} {next.Stamp} {next.Hint}").ToHex();
+
+                validH = previous.Hint.Equals(hint);
+                validK = previous.Keeper.Equals(keeper);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< BlockGraphService.VerifiyHashChain >>>: {ex.ToString()}");
+            }
+
+            return validH && validK;
         }
     }
 }

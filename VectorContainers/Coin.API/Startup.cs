@@ -76,6 +76,8 @@ namespace Coin.API
 
             services.AddOptions();
 
+            services.AddSingleton<InterpretBlocksProvider>();
+            services.AddSingleton<NetworkProvider>();
             services.AddSingleton<SigningProvider>();
 
             services.AddSingleton<SyncProvider>();
@@ -174,6 +176,7 @@ namespace Coin.API
                     sp.GetService<IHttpService>(),
                     sp.GetService<HierarchicalDataProvider>(),
                     sp.GetService<SigningProvider>(),
+                    sp.GetService<InterpretBlocksProvider>(),
                     sp.GetService<ITorClient>(),
                     sp.GetService<ILogger<BlockGraphService>>());
 

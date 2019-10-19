@@ -19,13 +19,16 @@ namespace Coin.API.Providers
 
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
+        private readonly NetworkProvider networkProvider;
         private readonly InterpretBlocksProvider interpretBlocksProvider;
         private readonly ILogger logger;
 
-        public SyncProvider(IUnitOfWork unitOfWork, IHttpService httpService, InterpretBlocksProvider interpretBlocksProvider, ILogger<SyncProvider> logger)
+        public SyncProvider(IUnitOfWork unitOfWork, IHttpService httpService, NetworkProvider networkProvider,
+            InterpretBlocksProvider interpretBlocksProvider, ILogger<SyncProvider> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
+            this.networkProvider = networkProvider;
             this.interpretBlocksProvider = interpretBlocksProvider;
             this.logger = logger;
         }
@@ -204,8 +207,8 @@ namespace Coin.API.Providers
         /// <returns></returns>
         private async Task<(ulong local, IEnumerable<NodeBlockCountProto> network)> Height()
         {
-            var l = (ulong)await httpService.GetNetworkProvider().BlockHeight();
-            var n = await httpService.GetNetworkProvider().FullNetworkBlockHeight();
+            var l = (ulong)await networkProvider.BlockHeight();
+            var n = await networkProvider.FullNetworkBlockHeight();
 
             return (l, n);
         }

@@ -17,17 +17,17 @@ namespace Coin.API.Controllers
     {
         private readonly IBlockGraphService blockGraphService;
         private readonly IHttpService httpService;
-        private readonly IUnitOfWork unitOfWork;
         private readonly NetworkProvider networkProvider;
+        private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
 
-        public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService, IUnitOfWork unitOfWork,
-            NetworkProvider networkProvider, ILogger<BlockGraphController> logger)
+        public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService,
+            NetworkProvider networkProvider, IUnitOfWork unitOfWork,ILogger<BlockGraphController> logger)
         {
             this.blockGraphService = blockGraphService;
             this.httpService = httpService;
-            this.unitOfWork = unitOfWork;
             this.networkProvider = networkProvider;
+            this.unitOfWork = unitOfWork;
             this.logger = logger;
         }
 

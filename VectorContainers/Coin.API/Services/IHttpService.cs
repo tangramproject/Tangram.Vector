@@ -2,13 +2,11 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Coin.API.Providers;
 
 namespace Coin.API.Services
 {
     public interface IHttpService
     {
-        NetworkProvider GetNetworkProvider();
         ulong NodeIdentity { get; }
         string GatewayUrl { get; }
         ConcurrentDictionary<ulong, string> Members { get; }

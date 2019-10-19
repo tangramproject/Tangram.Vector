@@ -44,17 +44,19 @@ namespace MessagePool.API.Services
 
                 if (msg != null)
                 {
-                    var hash = Core.API.LibSodium.Cryptography.GenericHashNoKey(message);
-                    var signed = await onionServiceClient.SignHashAsync(hash);
+                    //var hash = Core.API.LibSodium.Cryptography.GenericHashNoKey(message);
+                    //var signed = await onionServiceClient.SignHashAsync(hash);
 
-                    Broadcast(message);
+                    //Broadcast(message);
 
-                    return Util.SerializeProto(new MessageSignedBlockProto
-                    {
-                        Hash = hash.ToHex(),
-                        PublicKey = signed.PublicKey.ToHex(),
-                        Signature = signed.Signature.ToHex()
-                    });
+                    //return Util.SerializeProto(new MessageSignedBlockProto
+                    //{
+                    //    Hash = hash.ToHex(),
+                    //    PublicKey = signed.PublicKey.ToHex(),
+                    //    Signature = signed.Signature.ToHex()
+                    //});
+
+                    return message;
                 }
             }
             catch (Exception ex)

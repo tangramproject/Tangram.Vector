@@ -45,27 +45,35 @@ namespace Coin.API.Providers
             {
                 logger.LogInformation("<<< SyncProvider.SynchronizeCheck >>>: Checking block height.");
 
-                var (local, network) = await Height();
-                var maxNetworkHeight = (ulong)network.Max(m => m.BlockCount);
-                var numberOfBlocks = Difference(local, maxNetworkHeight);
-                var maxNetworks = network.Where(x => x.BlockCount == (long)maxNetworkHeight);
+                var maxNetworks = Enumerable.Empty<NodeBlockCountProto>();
+                ulong maxNetworkHeight = 0;
 
-                logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Local node block height ({local}). Network block height ({maxNetworks}).");
+                var (local, network) = await Height();
+
+                if (network.Any())
+                {
+                    maxNetworkHeight = network.Max(m => m.BlockCount);
+                    maxNetworks = network.Where(x => x.BlockCount == maxNetworkHeight);
+                }
+
+                logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Local node block height ({local}). Network block height ({maxNetworkHeight}).");
 
                 if (local < maxNetworkHeight)
                 {
+                    var numberOfBlocks = Difference(local, maxNetworkHeight);
+
                     logger.LogInformation($"<<< SyncProvider.SynchronizeCheck >>>: Synchronizing node. Total blocks behind ({numberOfBlocks})");
 
                     var downloads = await Synchronize(maxNetworks, numberOfBlocks);
                     if (downloads.Any() != true)
                     {
                         IsSynchronized = false;
-                        logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Failed to synchronize node. Number of blocks reached {local + (ulong)downloads.Count()} Expected Network block height ({maxNetworks}");
+                        logger.LogError($"<<< SyncProvider.SynchronizeCheck >>>: Failed to synchronize node. Number of blocks reached {local + (ulong)downloads.Count()} Expected Network block height ({maxNetworkHeight}");
                         return;
                     }
 
-                    var sum = (ulong)downloads.Sum(v => v.Value);
-                    if (!sum.Equals(numberOfBlocks))
+                    var downloadSum = (ulong)downloads.Sum(v => v.Value);
+                    if (!downloadSum.Equals(numberOfBlocks))
                     {
                         IsSynchronized = false;
                         return;

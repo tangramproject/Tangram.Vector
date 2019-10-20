@@ -27,9 +27,9 @@ namespace Coin.API.Providers
         /// 
         /// </summary>
         /// <returns></returns>
-        public async Task<long> NetworkBlockHeight()
+        public async Task<ulong> NetworkBlockHeight()
         {
-            long height = 0;
+            ulong height = 0;
 
             try
             {
@@ -65,7 +65,7 @@ namespace Coin.API.Providers
                         var fullNodeIdentity = httpService.GetFullNodeIdentity(response);
 
                         var jToken = Util.ReadJToken(response, "height");
-                        list.Add(new NodeBlockCountProto { Address = fullNodeIdentity.Value, BlockCount = jToken.Value<long>(), Node = fullNodeIdentity.Key });
+                        list.Add(new NodeBlockCountProto { Address = fullNodeIdentity.Value, BlockCount = jToken.Value<ulong>(), Node = fullNodeIdentity.Key });
                     }
                 }
             }

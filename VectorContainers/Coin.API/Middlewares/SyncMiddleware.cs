@@ -30,7 +30,6 @@ namespace Coin.API.Middlewares
                     {
                         httpContext.Response.Headers.Add("X-Response-Synchronized", new string[] { "false" });
                         httpContext.Response.StatusCode = StatusCodes.Status204NoContent;
-                        await httpContext.Response.WriteAsync("Node out of sync");
 
                         if (!syncProvider.IsRunning)
                         {

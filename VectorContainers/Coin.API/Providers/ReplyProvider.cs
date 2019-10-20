@@ -290,7 +290,7 @@ namespace Coin.API.Providers
                     var currentBlockGraphs = Util.SerializeProto(sending);
                     var uri = new Uri(new Uri(member), "blockgraphs");
 
-                    response = await httpService.Dial(uri.AbsolutePath, currentBlockGraphs);
+                    response = await httpService.Dial(uri.AbsoluteUri, currentBlockGraphs);
                     response.EnsureSuccessStatusCode();
 
                     var jToken = Util.ReadJToken(response, "protobufs");

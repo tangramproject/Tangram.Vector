@@ -56,6 +56,8 @@ namespace MessagePool.API.Services
                     //    Signature = signed.Signature.ToHex()
                     //});
 
+                    Broadcast(message);
+
                     return message;
                 }
             }

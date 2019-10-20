@@ -197,11 +197,16 @@ namespace Coin.API.Providers
                     }
                 }
 
-                var interpreted = list.Where(x => x.Round == list.Max(m => m.Round));
+                if (list.Any())
+                {
+                    var interpreted = list.Where(x => x.Round == list.Max(m => m.Round));
+                    Util.Shuffle(interpreted.ToArray());
+                    unitOfWork.Interpreted.Store(interpreted.First().Consumed, interpreted.First().Round);
 
-                Util.Shuffle(interpreted.ToArray());
+                    return;
+                }
 
-                unitOfWork.Interpreted.Store(interpreted.First().Consumed, interpreted.First().Round);
+                throw new InvalidOperationException("Sequence contains no elements");
             }
             catch (Exception ex)
             {

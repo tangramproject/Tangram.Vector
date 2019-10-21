@@ -21,30 +21,6 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
-        /// <returns></returns>
-        public Task<IEnumerable<BlockGraphProto>> GetNotIncluded()
-        {
-            var blockGraphs = Enumerable.Empty<BlockGraphProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-
-                blockGraphs = session.Query<BlockGraphProto>()
-                    .Where(x => !x.Included)
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockGraphRepository.GetNotIncluded >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockGraphs);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
         /// <param name="blocks"></param>
         /// <returns></returns>
         public async Task<List<BlockGraphProto>> More(IEnumerable<BlockGraphProto> blocks)
@@ -55,7 +31,7 @@ namespace Core.API.Model
             {
                 foreach (var next in blocks)
                 {
-                    var hasNext = await GetAny(next.Block.Hash);
+                    var hasNext = await GetWhere(x => x.Block.Hash.Equals(next.Block.Hash));
                     foreach (var nNext in hasNext)
                     {
                         var included = hasMoreBlocks
@@ -74,31 +50,6 @@ namespace Core.API.Model
             }
 
             return hasMoreBlocks;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        public Task<IEnumerable<BlockGraphProto>> GetAny(string hash)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentOutOfRangeException(nameof(hash));
-
-            var blockGraphs = Enumerable.Empty<BlockGraphProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                blockGraphs = session.Query<BlockGraphProto>().Where(x => x.Block.Hash.Equals(hash)).ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockGraphRepository.GetAny >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockGraphs);
         }
 
         /// <summary>
@@ -134,89 +85,6 @@ namespace Core.API.Model
             }
 
             return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public Task<IEnumerable<BlockGraphProto>> GetNotReplied(ulong node)
-        {
-            var blockGraphs = Enumerable.Empty<BlockGraphProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-
-                blockGraphs = session.Query<BlockGraphProto>()
-                    .Where(x => x.Block.Node.Equals(node) && x.Included && !x.Replied)
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockGraphRepository.GetNotReplied >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockGraphs);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <param name="node"></param>
-        /// <param name="round"></param>
-        /// <returns></returns>
-        public Task<IEnumerable<BlockGraphProto>> GetMany(string hash, ulong node, ulong round)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentOutOfRangeException(nameof(hash));
-
-            var blockGraphs = Enumerable.Empty<BlockGraphProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                blockGraphs = session.Query<BlockGraphProto>()
-                    .Where(x => x.Block.Hash.Equals(hash) && x.Block.Node.Equals(node) && x.Block.Round.Equals(round))
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockGraphRepository.GetMany >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockGraphs);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <param name="node"></param>
-        /// <returns></returns>
-        public Task<IEnumerable<BlockGraphProto>> GetMany(string hash, ulong node)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentNullException(nameof(hash));
-
-            var blockGraphs = Enumerable.Empty<BlockGraphProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-
-                blockGraphs = session.Query<BlockGraphProto>()
-                    .Where(x => x.Block.Node.Equals(node) && x.Block.Hash.Equals(hash))
-                    .OrderBy(r => r.Block.Round)
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockGraphRepository.GetMany >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockGraphs);
         }
 
         /// <summary>
@@ -300,31 +168,6 @@ namespace Core.API.Model
             catch (Exception ex)
             {
                 logger.LogError($"<<< BlockGraphRepository.GetPrevious >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockGraph);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <param name="node"></param>
-        /// <param name="round"></param>
-        /// <returns></returns>
-        public Task<BlockGraphProto> Get(string hash, ulong node, ulong round)
-        {
-            BlockGraphProto blockGraph = null;
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                blockGraph = session.Query<BlockGraphProto>()
-                    .FirstOrDefault(x => x.Block.Hash.Equals(hash) && x.Block.Node.Equals(node) && x.Block.Round.Equals(round));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockGraphRepository.Get >>>: {ex.ToString()}");
             }
 
             return Task.FromResult(blockGraph);

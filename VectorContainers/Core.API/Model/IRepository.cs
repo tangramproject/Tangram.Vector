@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 
 namespace Core.API.Model
@@ -9,5 +11,7 @@ namespace Core.API.Model
         IEnumerable<TValue> LoadAll<TValue>();
         Task<bool> Delete(TEntity entity);
         Task<TEntity> Load(string id);
+        Task<IEnumerable<TEntity>> GetWhere(Expression<Func<TEntity, bool>> expression);
+        Task<TEntity> GetFirstOrDefault(Expression<Func<TEntity, bool>> expression);
     }
 }

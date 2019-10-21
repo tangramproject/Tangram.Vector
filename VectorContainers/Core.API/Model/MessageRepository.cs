@@ -21,33 +21,6 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        public Task<IEnumerable<MessageProto>> GetMany(string hash)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentNullException(nameof(hash));
-
-            var messages = Enumerable.Empty<MessageProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-
-                messages = session.Query<MessageProto>().Where(x => x.Address.Equals(hash)).ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< MessageRepository.GetMany >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(messages);
-        }
-
-
-        /// <summary>
-        /// 
-        /// </summary>
         /// <returns></returns>
         public Task<int> Count(string hash)
         {

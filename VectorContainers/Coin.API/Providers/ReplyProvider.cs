@@ -39,7 +39,7 @@ namespace Coin.API.Providers
         {
             try
             {
-                var blocks = await unitOfWork.BlockGraph.GetNotIncluded();
+                var blocks = await unitOfWork.BlockGraph.GetWhere(x => !x.Included);
 
                 var moreBlocks = await unitOfWork.BlockGraph.More(blocks);
                 var blockHashLookup = moreBlocks.ToLookup(i => i.Block.Hash);
@@ -125,7 +125,7 @@ namespace Coin.API.Providers
 
             try
             {
-                var jobProto = await unitOfWork.Job.Get(next.Block.Hash);
+                var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(next.Block.Hash));
                 if (jobProto != null)
                 {
                     jobProto.Nodes = new List<ulong>();
@@ -198,7 +198,7 @@ namespace Coin.API.Providers
 
             foreach (var next in HierarchicalDataProvider.NextBlockGraph(blockHashLookup, httpService.NodeIdentity))
             {
-                var jobProto = await unitOfWork.Job.Get(next.Block.Hash);
+                var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(next.Block.Hash));
                 if (jobProto != null)
                 {
                     if (!jobProto.Status.Equals(JobState.Blockmainia) &&
@@ -225,7 +225,7 @@ namespace Coin.API.Providers
 
             try
             {
-                var blockGraphs = await unitOfWork.BlockGraph.GetNotReplied(httpService.NodeIdentity);
+                var blockGraphs = await unitOfWork.BlockGraph.GetWhere(x => x.Block.Node.Equals(httpService.NodeIdentity) && x.Included && !x.Replied);
                 if (blockGraphs.Any() != true)
                 {
                     return;
@@ -347,7 +347,7 @@ namespace Coin.API.Providers
 
                     using var session = unitOfWork.Document.OpenSession();
 
-                    var filter = blockInfos.Select(async x => await unitOfWork.Job.Get(x.Hash));
+                    var filter = blockInfos.Select(async x => await unitOfWork.Job.GetFirstOrDefault(g => g.Hash.Equals(x.Hash)));
                     for (var i = filter.GetEnumerator(); i.MoveNext();)
                     {
                         var x = i.Current;
@@ -397,8 +397,9 @@ namespace Coin.API.Providers
 
                     foreach (var next in blockInfos)
                     {
-                        var blockGraph = await unitOfWork.BlockGraph.Get(next.Hash, httpService.NodeIdentity, next.Round);
-                        if(blockGraph != null)
+                        var blockGraph = await unitOfWork.BlockGraph
+                            .GetFirstOrDefault(x => x.Block.Hash.Equals(next.Hash) && x.Block.Node.Equals(httpService.NodeIdentity) && x.Block.Round.Equals(next.Round));
+                        if (blockGraph != null)
                         {
                             blockGraph.Replied = replied;
                             session.Store(blockGraph, null, blockGraph.Id);

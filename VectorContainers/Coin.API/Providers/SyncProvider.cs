@@ -98,6 +98,11 @@ namespace Coin.API.Providers
         /// <returns></returns>
         public async Task<IEnumerable<KeyValuePair<ulong, int>>> Synchronize(IEnumerable<NodeBlockCountProto> pool, ulong numberOfBlocks)
         {
+            if (pool.Any() != true)
+            {
+                throw new InvalidOperationException("Sequence contains no elements");
+            }
+
             var throttler = new SemaphoreSlim(int.MaxValue);
             var downloads = new ConcurrentDictionary<ulong, int>();
 
@@ -169,13 +174,18 @@ namespace Coin.API.Providers
         /// </summary>
         /// <param name="blockCountProtos"></param>
         /// <returns></returns>
-        private async Task SetInterpreted(NodeBlockCountProto[] blockCountProtos)
+        private async Task SetInterpreted(IEnumerable<NodeBlockCountProto> blockCountProtos)
         {
+            if (blockCountProtos.Any() != true)
+            {
+                throw new InvalidOperationException("Sequence contains no elements");
+            }
+
             try
             {
                 var list = new List<InterpretedProto>();
 
-                Util.Shuffle(blockCountProtos);
+                Util.Shuffle(blockCountProtos.ToArray());
 
                 var addresses = blockCountProtos.Select(x => x.Address);
                 var responses = await httpService.Dial(DialType.Get, addresses, "interpreted");

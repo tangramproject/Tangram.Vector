@@ -37,7 +37,7 @@ namespace Coin.API.Providers
         {
             try
             {
-                var jobs = await unitOfWork.Job.GetStatusMany(JobState.Blockmainia);
+                var jobs = await unitOfWork.Job.GetWhere(x => x.Status == JobState.Blockmainia);
                 if (jobs.Any() != true)
                 {
                     return;
@@ -177,7 +177,7 @@ namespace Coin.API.Providers
 
                     foreach (var next in blockIDs)
                     {
-                        var jobProto = await unitOfWork.Job.Get(next.Hash);
+                        var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(next.Hash));
                         if (jobProto != null)
                         {
                             jobProto.Status = state;

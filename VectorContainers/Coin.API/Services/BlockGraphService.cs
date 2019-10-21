@@ -205,7 +205,7 @@ namespace Coin.API.Services
         /// <returns></returns>
         private async Task<BlockGraphProto> CanAdd(BlockGraphProto blockGraph, ulong node)
         {
-            var blockGraphs = await unitOfWork.BlockGraph.GetMany(blockGraph.Block.Hash, node);
+            var blockGraphs = await unitOfWork.BlockGraph.GetWhere(x => x.Block.Hash.Equals(blockGraph.Block.Hash) && x.Block.Node.Equals(node));
             if (blockGraphs.Any())
             {
                 var graph = blockGraphs.FirstOrDefault(x => x.Block.Round.Equals(blockGraph.Block.Round));
@@ -238,7 +238,7 @@ namespace Coin.API.Services
 
                     foreach (var block in interpreted.Blocks)
                     {
-                        var blockGraphs = await unitOfWork.BlockGraph.GetMany(block.Hash, httpService.NodeIdentity);
+                        var blockGraphs = await unitOfWork.BlockGraph.GetWhere(x => x.Block.Hash.Equals(block.Hash) && x.Block.Node.Equals(httpService.NodeIdentity));
                         if (blockGraphs.Any() != true)
                         {
                             logger.LogWarning($"<<< BlockGraphService.BlockmaniaCallback >>>: Unable to find blocks with - Hash: {block.Hash} Round: {block.Round} from node {block.Node}");

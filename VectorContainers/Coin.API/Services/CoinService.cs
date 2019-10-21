@@ -44,7 +44,7 @@ namespace Coin.API.Services
                         return null;
                     }
 
-                    var blockGraphs = await unitOfWork.BlockGraph.GetMany(coin.Stamp, httpService.NodeIdentity);
+                    var blockGraphs = await unitOfWork.BlockGraph.GetWhere(x => x.Block.Hash.Equals(coin.Stamp) && x.Block.Node.Equals(httpService.NodeIdentity));
                     if (blockGraphs.Any())
                     {
                         if (blockGraphs.FirstOrDefault(v => v.Block.SignedBlock.Coin.Version.Equals(coin.Version)) != null)
@@ -96,7 +96,7 @@ namespace Coin.API.Services
 
             try
             {
-                var blockId = await unitOfWork.BlockID.Get(key);
+                var blockId = await unitOfWork.BlockID.GetFirstOrDefault(x => x.SignedBlock.Coin.Hash.Equals(key));
                 if (blockId != null)
                 {
                     result = Util.SerializeProto(blockId);
@@ -187,7 +187,7 @@ namespace Coin.API.Services
 
             try
             {
-                var blockIds = await unitOfWork.BlockID.GetMany(key);
+                var blockIds = await unitOfWork.BlockID.GetWhere(x => x.SignedBlock.Coin.Hash.Equals(key));
                 if (blockIds?.Any() == true)
                 {
                     result = Util.SerializeProto(blockIds);

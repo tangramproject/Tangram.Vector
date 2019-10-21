@@ -151,7 +151,9 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockGraph = await unitOfWork.BlockGraph.GetMany(hash, httpService.NodeIdentity, (ulong)round);
+                var blockGraph = await unitOfWork.BlockGraph
+                    .GetWhere(x => x.Block.Hash.Equals(hash) && x.Block.Node.Equals(httpService.NodeIdentity) && x.Block.Round.Equals(round));
+
                 return new ObjectResult(new { protobuf = Util.SerializeProto(blockGraph) });
             }
             catch (Exception ex)

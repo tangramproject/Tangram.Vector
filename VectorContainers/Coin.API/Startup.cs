@@ -75,6 +75,7 @@ namespace Coin.API
             services.AddHttpContextAccessor();
 
             services.AddOptions();
+            services.Configure<Core.API.Consensus.BlockmainiaOptions>(Configuration);
 
             services.AddTransient<InterpretBlocksProvider>();
             services.AddTransient<NetworkProvider>();

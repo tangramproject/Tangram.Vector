@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -16,32 +14,6 @@ namespace Core.API.Model
         {
             this.dbContext = dbContext;
             this.logger = logger;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        public Task<JobProto> Get(string hash)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentOutOfRangeException(nameof(hash));
-
-            var jobs = Enumerable.Empty<JobProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                jobs = session.Query<JobProto>().Where(x => x.Hash.Equals(hash)).ToList();
-
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< JobRepository.Get >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(jobs.FirstOrDefault());
         }
 
         /// <summary>
@@ -74,29 +46,6 @@ namespace Core.API.Model
             }
 
             return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public Task<IEnumerable<JobProto>> GetStatusMany(JobState state)
-        {
-            var jobs = Enumerable.Empty<JobProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                jobs = session.Query<JobProto>()
-                    .Where(x => x.Status == state)
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< JobRepository.GetStatusMany >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(jobs);
         }
 
         /// <summary>

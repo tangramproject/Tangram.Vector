@@ -63,7 +63,9 @@ namespace Coin.API.Providers
                         continue;
                     }
 
-                    var coins = await unitOfWork.BlockID.GetManyCoins(blockIdProto.SignedBlock.Coin.Stamp, httpService.NodeIdentity);
+                    var coins = await unitOfWork.BlockID
+                        .GetWhere(x => x.SignedBlock.Coin.Stamp.Equals(blockIdProto.SignedBlock.Coin.Stamp) && x.Node.Equals(httpService.NodeIdentity));
+
                     if (coins?.Any() == true)
                     {
                         var list = coins.ToList();

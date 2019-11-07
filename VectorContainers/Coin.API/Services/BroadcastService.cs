@@ -31,7 +31,7 @@ namespace Coin.API.Services
                 {
                     try
                     {
-                        await broadcastProvider.Run(stoppingToken);
+                        await broadcastProvider.Run();
                         await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
                     }
                     catch { }

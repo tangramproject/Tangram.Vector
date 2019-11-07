@@ -63,7 +63,7 @@ namespace Coin.API
             services.AddSigningActorProvider();
             services.AddInterpretActorProvider();
             services.AddProcessBlockActorProvider();
-            services.AddSupervisorActorProvider();
+            services.AddSipActorProvider();
             services.AddBlockGraphService();
             services.AddCoinService();
 

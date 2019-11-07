@@ -39,9 +39,8 @@ namespace Coin.API.Providers
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public async Task Run(CancellationToken cancellationToken)
+        public Task Run()
         {
             try
             {
@@ -51,6 +50,8 @@ namespace Coin.API.Providers
             {
                 logger.LogError($"<<< ReplyProvider.Run >>>: {ex.ToString()}");
             }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>

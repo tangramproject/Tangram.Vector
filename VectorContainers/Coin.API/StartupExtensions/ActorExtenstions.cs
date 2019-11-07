@@ -74,7 +74,7 @@ namespace Coin.API.StartupExtensions
         /// </summary>
         /// <param name="services"></param>
         /// <returns></returns>
-        public static IServiceCollection AddSupervisorActorProvider(this IServiceCollection services)
+        public static IServiceCollection AddSipActorProvider(this IServiceCollection services)
         {
             services.AddSingleton<ISipActorProvider, SipActorProvider>(sp =>
             {

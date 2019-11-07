@@ -97,8 +97,9 @@ namespace Coin.API.Actors
                 catch (Exception ex)
                 {
                     logger.Error($"<<< BoostGraphActor.Register >>>: {ex.ToString()}");
+                    Shutdown(new HashedMessage(Id), "Public key not found.");
+                    return;
                 }
-
             }
 
             await InitializeBlocks(message);
@@ -149,7 +150,7 @@ namespace Coin.API.Actors
             if (string.IsNullOrEmpty(reason))
                 throw new ArgumentNullException(nameof(reason));
 
-            Context.ActorSelection("../supervisor-actor").Tell(new GracefulStopMessge(message.Hash, new TimeSpan(1), reason));
+            Context.ActorSelection("../sip-actor").Tell(new GracefulStopMessge(message.Hash, new TimeSpan(1), reason));
         }
 
         /// <summary>

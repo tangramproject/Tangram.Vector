@@ -90,6 +90,28 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
+        /// <param name="blockGraph"></param>
+        /// <param name="node"></param>
+        /// <returns></returns>
+        public async Task<BlockGraphProto> CanAdd(BlockGraphProto blockGraph, ulong node)
+        {
+            var blockGraphs = await GetWhere(x => x.Block.Hash.Equals(blockGraph.Block.Hash) && x.Block.Node.Equals(node));
+            if (blockGraphs.Any())
+            {
+                var graph = blockGraphs.FirstOrDefault(x => x.Block.Round.Equals(blockGraph.Block.Round));
+                if (graph != null)
+                {
+                    logger.LogWarning($"<<< BlockGraphRepository.CanAdd >>>: Block exists for node {graph.Block.Node} and round {graph.Block.Round}");
+                    return null;
+                }
+            }
+
+            return blockGraph;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <returns></returns>
         public Task<int> Count(ulong node)
         {
@@ -164,6 +186,35 @@ namespace Core.API.Model
                 round -= 1;
                 blockGraph = session.Query<BlockGraphProto>()
                     .FirstOrDefault(x => x.Block.Node.Equals(node) && x.Block.Round.Equals(round));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< BlockGraphRepository.GetPrevious >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(blockGraph);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="round"></param>
+        /// <returns></returns>
+        public Task<BlockGraphProto> GetPrevious(string hash, ulong node, ulong round)
+        {
+            if (round < 0)
+                throw new ArgumentOutOfRangeException(nameof(round));
+
+            BlockGraphProto blockGraph = null;
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+
+                round -= 1;
+                blockGraph = session.Query<BlockGraphProto>()
+                    .FirstOrDefault(x => x.Block.Hash.Equals(hash) && x.Block.Node.Equals(node) && x.Block.Round.Equals(round));
             }
             catch (Exception ex)
             {

@@ -91,8 +91,15 @@ namespace Core.API.Consensus
         private readonly Mutex GraphMutex;
         private readonly Channel<BlockGraph> Entries;
 
+        protected virtual void OnBlockmaniaInterpreted(Interpreted e)
+        {
+            BlockmaniaInterpreted?.Invoke(this, e);
+        }
+
+        public event EventHandler<Interpreted> BlockmaniaInterpreted;
+
         public List<BlockInfo> Blocks;
-        public Action<Interpreted> Cb;
+        public Func<Task<Interpreted>> action;
         public Dictionary<BlockID, ulong> Max;
         public int NodeCount;
         public ulong[] Nodes;
@@ -109,7 +116,6 @@ namespace Core.API.Consensus
         public Graph()
         {
             Blocks = new List<BlockInfo>();
-            Cb = (Interpreted x) => { };
             Max = new Dictionary<BlockID, ulong>();
             Resolved = new Dictionary<ulong, Dictionary<ulong, string>>();
             Statess = new Dictionary<BlockID, State>();
@@ -117,11 +123,10 @@ namespace Core.API.Consensus
             Consensus = new List<Consensus>();
         }
 
-        public Graph(Config cfg, Action<Interpreted> cb)
+        public Graph(Config cfg)
         {
             var f = (cfg.Nodes.Length - 1) / 3;
             Blocks = new List<BlockInfo>();
-            Cb = cb;
             Max = new Dictionary<BlockID, ulong>();
             NodeCount = cfg.Nodes.Length;
             Nodes = cfg.Nodes;
@@ -227,7 +232,7 @@ namespace Core.API.Consensus
             Round++;
             Debug.WriteLine($"Mem usage: g.max={Max.Count} g.statess={Statess.Count} g.blocks={Blocks.Count}");
             GraphMutex.ReleaseMutex();
-            Cb(new Interpreted(blocks, consumed, round));
+            OnBlockmaniaInterpreted(new Interpreted(blocks, consumed, round));
             if (Resolved.ContainsKey(round + 1) && hashes.Count == NodeCount)
             {
                 hashes = Resolved[round + 1];

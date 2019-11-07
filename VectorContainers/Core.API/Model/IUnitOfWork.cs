@@ -12,6 +12,7 @@ namespace Core.API.Model
         IMessageRepository Message { get; }
         IJobRepository Job { get; }
         IInterpretedRepository Interpreted { get; }
-
+        IStampRepository Stamp { get; }
+        ICacheRepository Cache { get; }
     }
 }

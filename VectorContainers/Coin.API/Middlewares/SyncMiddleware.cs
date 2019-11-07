@@ -17,7 +17,7 @@ namespace Coin.API.Middlewares
 
         public async Task Invoke(HttpContext httpContext, SyncProvider syncProvider)
         {
-            httpContext.Response.OnStarting(async state =>
+            httpContext.Response.OnStarting(state =>
             {
                 if (!syncProvider.IsSynchronized)
                 {
@@ -40,6 +40,9 @@ namespace Coin.API.Middlewares
                         }
                     }
                 }
+
+                return Task.CompletedTask;
+
             }, httpContext);
 
             await _next(httpContext);

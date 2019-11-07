@@ -10,5 +10,7 @@ namespace Core.API.Model
         Task<int> Count(ulong node);
         Task<BlockGraphProto> GetMax(string hash, ulong node);
         Task<BlockGraphProto> GetPrevious(ulong node, ulong round);
+        Task<BlockGraphProto> GetPrevious(string hash, ulong node, ulong round);
+        Task<BlockGraphProto> CanAdd(BlockGraphProto blockGraph, ulong node);
     }
 }

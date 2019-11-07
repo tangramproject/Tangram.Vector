@@ -1,4 +1,5 @@
 ﻿using System;
+using Akka.Actor;
 using Core.API.Onion;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
@@ -56,7 +57,7 @@ namespace Onion.API
             services.AddHostedService<TorProcessService>();
         }
 
-        public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app)
         {
             var pathBase = Configuration["PATH_BASE"];
             if (!string.IsNullOrEmpty(pathBase))

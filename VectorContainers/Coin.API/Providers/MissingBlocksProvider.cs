@@ -153,7 +153,7 @@ namespace Coin.API.Providers
 
                                         next.ForEach((k) =>
                                         {
-                                            HierarchicalDataProvider.AddDependency(jobProto.BlockGraph, k.Value);
+                                            BlockGraphProto.AddDependency(jobProto.BlockGraph, k.Value);
                                         });
 
                                         jobProto.TotalNodes = next.Count();

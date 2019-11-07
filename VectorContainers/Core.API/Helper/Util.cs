@@ -233,10 +233,10 @@ namespace Core.API.Helper
             return ret;
         }
 
-        public static ulong HostNameToHex(string hostname)
+        public static ulong HashToId(string hash)
         {
-            if (hostname == null)
-                throw new ArgumentNullException(nameof(hostname));
+            if (hash == null)
+                throw new ArgumentNullException(nameof(hash));
 
             var v = new StringBuilder();
             ulong node;
@@ -245,7 +245,7 @@ namespace Core.API.Helper
             {
                 for (int i = 6; i < 12; i++)
                 {
-                    var c = hostname[i];
+                    var c = hash[i];
                     v.Append(new char[] { hexUpper[c >> 4], hexUpper[c & 0x0f] });
                 }
 

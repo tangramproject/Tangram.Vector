@@ -1,33 +1,39 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Coin.API.Services;
+using Core.API.Consensus;
 using Core.API.Helper;
 using Core.API.Model;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 
 namespace Coin.API.Providers
 {
-    public class ReplyProvider
+    public class BroadcastProvider
     {
         private static readonly AsyncLock markStatesAsMutex = new AsyncLock();
         private static readonly AsyncLock markRepliesAsMutex = new AsyncLock();
 
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
-        private readonly SigningProvider signingProvider;
         private readonly ILogger logger;
+        private readonly BlockmainiaOptions blockmainiaOptions;
+        private readonly ConcurrentDictionary<ulong, CancellationTokenSource> broadcasts;
 
-        public ReplyProvider(IUnitOfWork unitOfWork, IHttpService httpService, SigningProvider signingProvider, ILogger<ReplyProvider> logger)
+        public BroadcastProvider(IUnitOfWork unitOfWork, IHttpService httpService, IOptions<BlockmainiaOptions> blockmainiaOptions, ILogger<BroadcastProvider> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
-            this.signingProvider = signingProvider;
+            this.blockmainiaOptions = blockmainiaOptions.Value;
             this.logger = logger;
+
+            broadcasts = new ConcurrentDictionary<ulong, CancellationTokenSource>();
         }
 
         /// <summary>
@@ -39,14 +45,7 @@ namespace Coin.API.Providers
         {
             try
             {
-                var blocks = await unitOfWork.BlockGraph.GetWhere(x => !x.Included);
-
-                var moreBlocks = await unitOfWork.BlockGraph.More(blocks);
-                var blockHashLookup = moreBlocks.ToLookup(i => i.Block.Hash);
-
-                await unitOfWork.BlockGraph.Include(blocks, httpService.NodeIdentity);
-                await AddOrUpdateJob(blockHashLookup);
-                await Reply();
+                MaintainBroadcasts();
             }
             catch (Exception ex)
             {
@@ -57,178 +56,106 @@ namespace Coin.API.Providers
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="next"></param>
-        /// <returns></returns>
-        private async Task<JobProto> AddJob(BlockGraphProto next)
+        private void MaintainBroadcasts()
         {
-            if (next == null)
-                throw new ArgumentNullException(nameof(next));
-
-            JobProto job = null;
-
             try
             {
-                job = new JobProto
+                foreach (var member in httpService.Members
+                    .Where(member => !broadcasts.TryGetValue(member.Key, out CancellationTokenSource cancellation)).Select(member => member))
                 {
-                    Epoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    Hash = next.Block.Hash,
-                    BlockGraph = next,
-                    ExpectedTotalNodes = 4,
-                    Node = httpService.NodeIdentity,
-                    TotalNodes = httpService.Members.Count(),
-                    Status = JobState.Started
-                };
-
-                job.Nodes = new List<ulong>();
-                job.Nodes.AddRange(next.Deps?.Select(n => n.Block.Node));
-
-                job.WaitingOn = new List<ulong>();
-                job.WaitingOn.AddRange(httpService.Members.Select(k => k.Key).ToArray());
-
-                job.Status = Incoming(job, next);
-
-                ClearWaitingOn(job);
-
-                await unitOfWork.Job.StoreOrUpdate(job);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< ReplyProvider.AddJob >>>: {ex.ToString()}");
-            }
-
-            return job;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="job"></param>
-        private static void ClearWaitingOn(JobProto job)
-        {
-            if (job.Status.Equals(JobState.Blockmainia) || job.Status.Equals(JobState.Running))
-            {
-                job.WaitingOn.Clear();
-            }
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="next"></param>
-        /// <returns></returns>
-        private async Task<JobProto> ExistingJob(BlockGraphProto next)
-        {
-            if (next == null)
-                throw new ArgumentNullException(nameof(next));
-
-            JobProto job = null;
-
-            try
-            {
-                var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(next.Block.Hash));
-                if (jobProto != null)
-                {
-                    jobProto.Nodes = new List<ulong>();
-                    jobProto.Nodes.AddRange(next.Deps?.Select(n => n.Block.Node));
-
-                    jobProto.WaitingOn = new List<ulong>();
-                    jobProto.WaitingOn.AddRange(httpService.Members.Select(k => k.Key).ToArray());
-
-                    if (!jobProto.BlockGraph.Equals(next))
+                    var cts = new CancellationTokenSource();
+                    Broadcast(member.Key, cts.Token);
+                    if (!broadcasts.TryAdd(member.Key, cts))
                     {
-                        jobProto.Status = Incoming(jobProto, next);
-
-                        ClearWaitingOn(jobProto);
+                        logger.LogError($"<<< ReplyProvider.MaintainBroadcasts >>>: Failed adding {member.Key}");
                     }
+                }
 
-                    jobProto.BlockGraph = next;
-
-                    await unitOfWork.Job.Include(jobProto);
-
-                    job = await unitOfWork.Job.StoreOrUpdate(jobProto, jobProto.Id);
+                foreach (var broadcast in broadcasts
+                    .Where(broadcast => !httpService.Members.TryGetValue(broadcast.Key, out string url)).Select(broadcast => broadcast))
+                {
+                    broadcast.Value.Cancel();
+                    if (!broadcasts.TryRemove(broadcast.Key, out CancellationTokenSource cancellation))
+                    {
+                        logger.LogError($"<<< ReplyProvider.MaintainBroadcasts >>>: Failed removing {broadcast.Key}");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< ReplyProvider.ExistingJob >>>: {ex.ToString()}");
+                logger.LogError($"<<< ReplyProvider.MaintainBroadcasts >>>: {ex.ToString()}");
             }
-
-            return job;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="next"></param>
-        /// <param name="job"></param>
-        public static JobState Incoming(JobProto job, BlockGraphProto next)
-        {
-            if (job.Nodes.Any())
-            {
-                var nodes = job.Nodes?.Except(next.Deps.Select(x => x.Block.Node));
-                if (nodes.Any() != true)
-                {
-                    return JobState.Blockmainia;
-                }
-            }
-
-            if (job.WaitingOn.Any())
-            {
-                var waitingOn = job.WaitingOn?.Except(next.Deps.Select(x => x.Block.Node));
-                if (waitingOn.Any() != true)
-                {
-                    return JobState.Blockmainia;
-                }
-            }
-
-            return job.Status;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="blockHashLookup"></param>
         /// <returns></returns>
-        private async Task AddOrUpdateJob(ILookup<string, BlockGraphProto> blockHashLookup)
+        private void Broadcast(ulong peer, CancellationToken stoppingToken)
         {
-            if (blockHashLookup.Any() != true)
+            _ = Task.Factory.StartNew(async () =>
             {
-                return;
-            }
+                var initialBackoff = blockmainiaOptions.InitialBackoff;
+                var interval = blockmainiaOptions.RoundInterval;
+                var backoff = initialBackoff;
+                var maxBackoff = blockmainiaOptions.MaxBackoff;
+                var retry = false;
 
-            foreach (var next in HierarchicalDataProvider.NextBlockGraph(blockHashLookup, httpService.NodeIdentity))
-            {
-                var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(next.Block.Hash));
-                if (jobProto != null)
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    if (!jobProto.Status.Equals(JobState.Blockmainia) &&
-                        !jobProto.Status.Equals(JobState.Running) &&
-                        !jobProto.Status.Equals(JobState.Polished))
+                    if (retry)
                     {
-                        await ExistingJob(next);
+                        backoff *= 2;
+                        if (backoff == maxBackoff)
+                        {
+                            backoff = maxBackoff;
+                        }
+
+                        await Task.Delay((int)backoff);
+                        retry = false;
                     }
 
-                    continue;
-                }
+                    try
+                    {
+                        var responses = await Reply(httpService.Members[peer]);
+                        if (responses.Any() != true)
+                        {
+                            await Task.Delay((int)interval);
+                        }
 
-                await AddJob(next);
-            }
+                        foreach (var response in responses)
+                        {
+                            if (response.IsSuccessStatusCode)
+                            {
+                                backoff = initialBackoff;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        retry = true;
+                    }
+                }
+            });
         }
 
         /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>
-        private async Task Reply()
+        private async Task<IEnumerable<HttpResponseMessage>> Reply(string uri)
         {
             SemaphoreSlim throttler = null;
+            var responses = Enumerable.Empty<HttpResponseMessage>();
 
             try
             {
-                var blockGraphs = await unitOfWork.BlockGraph.GetWhere(x => x.Block.Node.Equals(httpService.NodeIdentity) && x.Included && !x.Replied);
+                var blockGraphs = await unitOfWork.BlockGraph
+                    .GetWhere(x => x.Block.Node.Equals(httpService.NodeIdentity) && x.Included && !x.Replied);
+
                 if (blockGraphs.Any() != true)
                 {
-                    return;
+                    return responses;
                 }
 
                 var numberOfBlocks = 100;
@@ -237,28 +164,27 @@ namespace Coin.API.Providers
 
                 throttler = new SemaphoreSlim(int.MaxValue);
 
-                foreach (var member in httpService.Members)
+                var series = new long[numberOfBatches];
+                foreach (var n in series)
                 {
-                    await throttler.WaitAsync();
-
-                    var series = new long[numberOfBatches];
-                    foreach (var n in series)
+                    var batch = blockGraphs.Skip((int)(n * numberOfBlocks)).Take(numberOfBlocks);
+                    if (batch.Any() != true)
                     {
-                        var batch = blockGraphs.Skip((int)(n * numberOfBlocks)).Take(numberOfBlocks);
-                        if (batch.Any() != true)
-                        {
-                            continue;
-                        }
-
-                        tasks.Add(Replies(throttler, member.Value, batch));
+                        continue;
                     }
+
+                    await throttler.WaitAsync();
+                    tasks.Add(Replies(throttler, uri, batch));
                 }
 
                 try
                 {
-                    await Task.WhenAll(tasks.ToArray());
+                    responses = await Task.WhenAll(tasks.ToArray());
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    logger.LogError($"<<< ReplyProvider.Reply >>>: {ex.ToString()}");
+                }
 
             }
             catch (Exception ex)
@@ -269,6 +195,8 @@ namespace Coin.API.Providers
             {
                 throttler?.Dispose();
             }
+
+            return responses;
         }
 
         /// <summary>
@@ -415,45 +343,6 @@ namespace Coin.API.Providers
             }
 
             return;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="blockGraph"></param>
-        /// <returns></returns>
-        private async Task<BlockGraphProto> CreateReply(BlockGraphProto blockGraph)
-        {
-            if (blockGraph == null)
-                throw new ArgumentNullException(nameof(blockGraph));
-
-            try
-            {
-                var round = blockGraph.Block.Round;
-                var signed = await signingProvider.Sign(httpService.NodeIdentity, blockGraph, round, await httpService.GetPublicKey());
-                if (signed == null)
-                {
-                    logger.LogError($"<<< ReplyProvider.CreateReply >>>: Could not sign Reply block");
-                    return null;
-                }
-
-                var stored = new BlockGraphProto
-                {
-                    Block = blockGraph.Block,
-                    Deps = blockGraph.Deps?.Select(d => d).ToList(),
-                    Prev = blockGraph.Prev ?? null,
-                    Included = blockGraph.Included,
-                    Replied = blockGraph.Replied
-                };
-
-                return stored;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< ReplyProvider.CreateReply >>>: {ex.ToString()}");
-            }
-
-            return null;
         }
     }
 }

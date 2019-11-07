@@ -7,14 +7,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Coin.API.Services
 {
-    public class ReplyDataService : BackgroundService
+    public class BroadcastService : BackgroundService
     {
-        private readonly ReplyProvider replyProvider;
+        private readonly BroadcastProvider broadcastProvider;
         private readonly ILogger logger;
 
-        public ReplyDataService(ReplyProvider replyProvider, ILogger<ReplyProvider> logger)
+        public BroadcastService(BroadcastProvider broadcastProvider, ILogger<BroadcastService> logger)
         {
-            this.replyProvider = replyProvider;
+            this.broadcastProvider = broadcastProvider;
             this.logger = logger;
         }
 
@@ -31,7 +31,7 @@ namespace Coin.API.Services
                 {
                     try
                     {
-                        await replyProvider.Run(stoppingToken);
+                        await broadcastProvider.Run(stoppingToken);
                         await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
                     }
                     catch { }

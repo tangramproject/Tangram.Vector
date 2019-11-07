@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Core.API.Model;
+using Core.API.Onion;
 
 namespace Coin.API.Services
 {
     public interface IHttpService
     {
+        ITorClient GetTorClient();
         ulong NodeIdentity { get; }
         string GatewayUrl { get; }
         ConcurrentDictionary<ulong, string> Members { get; }
@@ -21,5 +24,10 @@ namespace Coin.API.Services
         Task<byte[]> GetPublicKey();
         Task<List<KeyValuePair<ulong, string>>> GetMemberIdentities();
         KeyValuePair<ulong, string> GetFullNodeIdentity(HttpResponseMessage response);
+        IdentityProto GetIdentity(ulong peer);
+        Task<PayloadProto> SignPayload(object value);
+        Task<KeyValuePair<ulong, string>> GetMemberIdentity(ulong node);
+        Task<KeyValuePair<ulong, string>> VerifyPeer(HttpResponseMessage response);
+        void Dispose();
    }
 }

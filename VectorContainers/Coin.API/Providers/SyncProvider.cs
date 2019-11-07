@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Coin.API.ActorProviders;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
@@ -19,17 +20,17 @@ namespace Coin.API.Providers
 
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
-        private readonly NetworkProvider networkProvider;
-        private readonly InterpretBlocksProvider interpretBlocksProvider;
+        private readonly INetworkActorProvider networkActorProvider;
+        private readonly IInterpretActorProvider interpretActorProvider;
         private readonly ILogger logger;
 
-        public SyncProvider(IUnitOfWork unitOfWork, IHttpService httpService, NetworkProvider networkProvider,
-            InterpretBlocksProvider interpretBlocksProvider, ILogger<SyncProvider> logger)
+        public SyncProvider(IUnitOfWork unitOfWork, IHttpService httpService, INetworkActorProvider networkActorProvider,
+            IInterpretActorProvider interpretActorProvider, ILogger<SyncProvider> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
-            this.networkProvider = networkProvider;
-            this.interpretBlocksProvider = interpretBlocksProvider;
+            this.networkActorProvider = networkActorProvider;
+            this.interpretActorProvider = interpretActorProvider;
             this.logger = logger;
         }
 
@@ -78,8 +79,6 @@ namespace Coin.API.Providers
                         IsSynchronized = false;
                         return;
                     }
-
-                    await SetInterpreted(maxNetworks.ToArray());
                 }
 
                 IsSynchronized = true;
@@ -123,10 +122,9 @@ namespace Coin.API.Providers
                             Util.Shuffle(pool.ToArray());
 
                             var response = await httpService.Dial(DialType.Get, pool.First().Address, $"coins/{n * (long)numberOfBlocks}/{numberOfBlocks}");
-                            var read = response.Content.ReadAsStringAsync().Result;
-                            var jObject = JObject.Parse(read);
-                            var jToken = jObject.GetValue("protobufs");
-                            var byteArray = Convert.FromBase64String(jToken.Value<string>());
+
+                            var read = Util.ReadJToken(response, "protobufs");
+                            var byteArray = Convert.FromBase64String(read.Value<string>());
                             var blockIdProtos = Util.DeserializeListProto<BlockIDProto>(byteArray);
 
                             logger.LogInformation($"<<< Synchronize >>>: Retrieved {byteArray.Length} bytes from {response.RequestMessage.RequestUri.Authority}");
@@ -136,7 +134,7 @@ namespace Coin.API.Providers
                             if (byteArray.Length > 0)
                             {
                                 var blockIDs = blockIdProtos.Select(x => new Core.API.Consensus.BlockID(x.Hash, x.Node, x.Round, x.SignedBlock)).AsEnumerable();
-                                var success = await interpretBlocksProvider.Interpret(blockIDs);
+                                var success = await interpretActorProvider.Interpret(new Core.API.Messages.InterpretBlocksMessage(httpService.NodeIdentity, blockIDs));
 
                                 downloads.TryAdd(fullIdentity.Key, blockIDs.Count());
                                 return;
@@ -172,66 +170,11 @@ namespace Coin.API.Providers
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="blockCountProtos"></param>
-        /// <returns></returns>
-        private async Task SetInterpreted(IEnumerable<NodeBlockCountProto> blockCountProtos)
-        {
-            if (blockCountProtos.Any() != true)
-            {
-                throw new InvalidOperationException("Sequence contains no elements");
-            }
-
-            try
-            {
-                var list = new List<InterpretedProto>();
-
-                Util.Shuffle(blockCountProtos.ToArray());
-
-                var addresses = blockCountProtos.Select(x => x.Address);
-                var responses = await httpService.Dial(DialType.Get, addresses, "interpreted");
-
-                foreach (var response in responses)
-                {
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var read = response.Content.ReadAsStringAsync().Result;
-                        var jObject = JObject.Parse(read);
-                        var jToken = jObject.GetValue("interpreted");
-                        var byteArray = Convert.FromBase64String(jToken.Value<string>());
-
-                        if (byteArray.Length > 0)
-                        {
-                            var interpretedProto = Util.DeserializeProto<InterpretedProto>(byteArray);
-                            list.Add(interpretedProto);
-                        }
-                    }
-                }
-
-                if (list.Any())
-                {
-                    var interpreted = list.Where(x => x.Round == list.Max(m => m.Round));
-                    Util.Shuffle(interpreted.ToArray());
-                    unitOfWork.Interpreted.Store(interpreted.First().Consumed, interpreted.First().Round);
-
-                    return;
-                }
-
-                throw new InvalidOperationException("Sequence contains no elements");
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< SyncProvider.SetInterpreted >>>: Failed to set interpreted: {ex.ToString()}");
-            }
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
         /// <returns></returns>
         private async Task<(ulong local, IEnumerable<NodeBlockCountProto> network)> Height()
         {
-            var l = (ulong)await networkProvider.BlockHeight();
-            var n = await networkProvider.FullNetworkBlockHeight();
+            var l = (ulong)await networkActorProvider.BlockHeight();
+            var n = await networkActorProvider.FullNetworkBlockHeight();
 
             return (l, n);
         }

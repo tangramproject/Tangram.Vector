@@ -1,5 +1,4 @@
-﻿using System;
-namespace Core.API.Consensus
+﻿namespace Core.API.Consensus
 {
     public class BlockmainiaOptions
     {

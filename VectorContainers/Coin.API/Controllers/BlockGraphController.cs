@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Coin.API.Providers;
+using Coin.API.ActorProviders;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
@@ -17,12 +17,12 @@ namespace Coin.API.Controllers
     {
         private readonly IBlockGraphService blockGraphService;
         private readonly IHttpService httpService;
-        private readonly NetworkProvider networkProvider;
+        private readonly INetworkActorProvider networkProvider;
         private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
 
         public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService,
-            NetworkProvider networkProvider, IUnitOfWork unitOfWork,ILogger<BlockGraphController> logger)
+            INetworkActorProvider networkProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphController> logger)
         {
             this.blockGraphService = blockGraphService;
             this.httpService = httpService;
@@ -44,9 +44,9 @@ namespace Coin.API.Controllers
             try
             {
                 var blockGrpahProto = Util.DeserializeProto<BlockGraphProto>(blockGraph);
-                var proto = await blockGraphService.AddBlockGraph(blockGrpahProto);
+                var block = await blockGraphService.SetBlockGraph(blockGrpahProto);
 
-                return new ObjectResult(new { protobuf = Util.SerializeProto(proto) });
+                return new ObjectResult(new { protobuf = Util.SerializeProto(block) });
             }
             catch (Exception ex)
             {
@@ -75,7 +75,7 @@ namespace Coin.API.Controllers
 
                     for (int i = 0; i < blockGraphProtos.Count(); i++)
                     {
-                        var added = await blockGraphService.AddBlockGraph(blockGraphProtos.ElementAt(i));
+                        var added = await blockGraphService.SetBlockGraph(blockGraphProtos.ElementAt(i));
                         if (added != null)
                         {
                             var next = blockGraphProtos.ElementAt(i);
@@ -175,8 +175,12 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var id = await httpService.GetPublicKey();
-                return new ObjectResult(new { identity = id });
+                var pubKey = Request.Headers["x-pub"];
+                var peer = Util.HashToId(pubKey.First());
+                var identity = httpService.GetIdentity(peer);
+                var signedPayload = await httpService.SignPayload(identity);
+
+                return new ObjectResult(new { identity = Util.SerializeProto(signedPayload) });
             }
             catch (Exception ex)
             {

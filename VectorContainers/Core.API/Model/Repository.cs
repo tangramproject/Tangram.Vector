@@ -102,15 +102,20 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="entity"></param>
+        /// <param name="id"></param>
         /// <returns></returns>
-        public Task<bool> Delete(TEntity entity)
+        public Task<bool> Delete(string id)
         {
             bool result = false;
+
             try
             {
                 using var session = dbContext.Document.OpenSession();
+
+                var entity = session.Load<TEntity>(id);
+
                 session.Delete(entity);
+                session.SaveChanges();
 
                 result = true;
             }

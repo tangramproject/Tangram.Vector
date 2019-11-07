@@ -44,7 +44,9 @@ namespace Coin.API.Services
                         return null;
                     }
 
-                    var blockGraphs = await unitOfWork.BlockGraph.GetWhere(x => x.Block.Hash.Equals(coin.Stamp) && x.Block.Node.Equals(httpService.NodeIdentity));
+                    var blockGraphs = await unitOfWork.BlockGraph
+                        .GetWhere(x => x.Block.Hash.Equals(coin.Stamp) && x.Block.Node.Equals(httpService.NodeIdentity));
+
                     if (blockGraphs.Any())
                     {
                         if (blockGraphs.FirstOrDefault(v => v.Block.SignedBlock.Coin.Version.Equals(coin.Version)) != null)
@@ -64,13 +66,13 @@ namespace Coin.API.Services
                         Deps = new List<DepProto>()
                     };
 
-                    var addedBlockGraph = await blockGraphService.AddBlockGraph(blockGraph);
-                    if (addedBlockGraph == null)
+                    var graphProto = await blockGraphService.SetBlockGraph(blockGraph);
+                    if (graphProto == null)
                     {
                         return null;
                     }
 
-                    var block = Util.SerializeProto(addedBlockGraph.Block);
+                    var block = Util.SerializeProto(graphProto.Block);
                     return block;
                 }
             }

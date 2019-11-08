@@ -5,7 +5,7 @@ namespace Core.API.Model
 {
     public interface IBlockIDRepository : IRepository<BlockIDProto>
     {
-        Task<bool> HasCoin(string hash);
+        Task<bool> HasCoin(string hash, int version);
         Task<IEnumerable<BlockIDProto>> GetRange(int skip, int take);
         Task<int> Count(ulong node);
     }

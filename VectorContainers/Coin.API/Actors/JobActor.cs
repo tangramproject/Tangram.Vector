@@ -26,7 +26,14 @@ namespace Coin.API.Actors
 
             logger = Context.GetLogger();
 
-            ReceiveAsync<HashedMessage>(async message => await Register(message));
+            ReceiveAsync<ReliableDeliveryEnvelopeMessage<WriteMessage>>(async write =>
+            {
+                Sender.Tell(new ReliableDeliveryAckMessage(write.MessageId));
+
+                await Register(new HashedMessage(write.Message.Content.FromHex()));
+            });
+
+            // ReceiveAsync<HashedMessage>(async message => await Register(message));
         }
 
         /// <summary>

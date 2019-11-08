@@ -52,7 +52,7 @@ namespace Core.API.Model
         /// </summary>
         /// <param name="hash"></param>
         /// <returns></returns>
-        public Task<bool> HasCoin(string hash)
+        public Task<bool> HasCoin(string hash, int version)
         {
             if (string.IsNullOrEmpty(hash))
                 throw new ArgumentNullException(nameof(hash));
@@ -63,7 +63,9 @@ namespace Core.API.Model
             {
                 using var session = dbContext.Document.OpenSession();
 
-                var coin = session.Query<BlockIDProto>().FirstOrDefault(x => x.SignedBlock.Coin.Commitment.Equals(hash));
+                var coin = session.Query<BlockIDProto>()
+                    .FirstOrDefault(x => x.SignedBlock.Coin.Stamp.Equals(hash) && x.SignedBlock.Coin.Version.Equals(version));
+
                 exists = coin != null;
             }
             catch (Exception ex)

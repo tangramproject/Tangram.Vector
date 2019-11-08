@@ -38,21 +38,20 @@ namespace Coin.API.Services
                 var coinHasElements = coin.Validate().Any();
                 if (!coinHasElements)
                 {
-                    var blockIDExists = await unitOfWork.BlockID.HasCoin(coin.Commitment);
-                    if (blockIDExists)
+                    var blockIDExist = await unitOfWork.BlockID.HasCoin(coin.Stamp, coin.Version);
+                    if (blockIDExist)
                     {
                         return null;
                     }
 
-                    var blockGraphs = await unitOfWork.BlockGraph
-                        .GetWhere(x => x.Block.Hash.Equals(coin.Stamp) && x.Block.Node.Equals(httpService.NodeIdentity));
+                    var blockGraphExist = await unitOfWork.BlockGraph.GetFirstOrDefault(x =>
+                        x.Block.Hash.Equals(coin.Stamp) &&
+                        x.Block.SignedBlock.Coin.Version.Equals(coin.Version) &&
+                        x.Block.Node.Equals(httpService.NodeIdentity));
 
-                    if (blockGraphs.Any())
+                    if (blockGraphExist != null)
                     {
-                        if (blockGraphs.FirstOrDefault(v => v.Block.SignedBlock.Coin.Version.Equals(coin.Version)) != null)
-                        {
-                            return null;
-                        }
+                        return null;
                     }
 
                     var blockGraph = new BlockGraphProto

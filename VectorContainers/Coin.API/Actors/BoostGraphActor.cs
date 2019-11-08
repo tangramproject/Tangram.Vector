@@ -6,6 +6,7 @@ using Akka.Actor;
 using Akka.Event;
 using Coin.API.ActorProviders;
 using Coin.API.Services;
+using Core.API.Actors.Delivery;
 using Core.API.Consensus;
 using Core.API.Helper;
 using Core.API.Messages;
@@ -31,6 +32,7 @@ namespace Coin.API.Actors
         private LastInterpretedMessage lastInterpretedMessage;
         private byte[] publicKey;
         private IActorRef jobActor;
+        private IActorRef atLeastOnceDeliveryActor;
 
         public byte[] Id { get; private set; }
 
@@ -150,7 +152,7 @@ namespace Coin.API.Actors
             if (string.IsNullOrEmpty(reason))
                 throw new ArgumentNullException(nameof(reason));
 
-            Context.ActorSelection("../sip-actor").Tell(new GracefulStopMessge(message.Hash, new TimeSpan(1), reason));
+            Sender.Tell(new GracefulStopMessge(message.Hash, new TimeSpan(1), reason));
         }
 
         /// <summary>
@@ -189,10 +191,22 @@ namespace Coin.API.Actors
                     }
                 }
 
-                jobActor.Tell(new HashedMessage(isSet.Block.Hash.FromHex()));
+                JobDelivery(message);
+
+                //jobActor.Tell(new HashedMessage(message.Hash));
 
                 await Process(new ProcessBlockMessage(isSet));
             }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        private void JobDelivery(HashedMessage message)
+        {
+            var name = $"delivery-actor-{Util.HashToId(message.Hash.ToHex())}";
+            atLeastOnceDeliveryActor = Context.ActorOf(AtLeastOnceDeliveryActor.Props(jobActor, message.Hash.ToHex()), name);
         }
 
         /// <summary>

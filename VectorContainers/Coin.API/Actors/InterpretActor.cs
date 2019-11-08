@@ -49,7 +49,7 @@ namespace Coin.API.Actors
 
             foreach (var block in message.BlockIDs)
             {
-                var coinExists = await unitOfWork.BlockID.HasCoin(block.SignedBlock.Coin.Commitment);
+                var coinExists = await unitOfWork.BlockID.HasCoin(block.SignedBlock.Coin.Stamp, block.SignedBlock.Coin.Version);
                 if (coinExists)
                 {
                     logger.Warning($"<<< InterpretBlocksProvider.InterpretBlocks >>>: Coin exists for block {block.Round} from node {block.Node}");

@@ -7,6 +7,7 @@ VectorContainers/.vs/VectorContainers/xs/sqlite3/db.lock
 # misc
 /bin
 /obj
+VectorContainers/Coin.API/snapshots/
 
 **/publish/
 **/Coin.API/VData/

@@ -31,9 +31,8 @@ namespace Coin.API.Actors
                 Sender.Tell(new ReliableDeliveryAckMessage(write.MessageId));
 
                 await Register(new HashedMessage(write.Message.Content.FromHex()));
+                await Sender.GracefulStop(TimeSpan.FromSeconds(1));
             });
-
-            // ReceiveAsync<HashedMessage>(async message => await Register(message));
         }
 
         /// <summary>

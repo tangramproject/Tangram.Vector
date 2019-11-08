@@ -193,8 +193,6 @@ namespace Coin.API.Actors
 
                 JobDelivery(message);
 
-                //jobActor.Tell(new HashedMessage(message.Hash));
-
                 await Process(new ProcessBlockMessage(isSet));
             }
         }
@@ -244,7 +242,7 @@ namespace Coin.API.Actors
         /// 
         /// </summary>
         /// <returns></returns>
-        private ulong GetVersion()
+        private ulong GetLatestRound()
         {
             ulong result = 0;
 
@@ -371,6 +369,13 @@ namespace Coin.API.Actors
                 {
                     if (prev.Block.Round + 1 != signed.Block.Round)
                         signed.Prev = prev.Block;
+                }
+
+                round = GetLatestRound();
+
+                if (round + 1 < signed.Block.Round)
+                {
+                    return null;
                 }
 
                 var stored = await SetBlockGraph(signed);

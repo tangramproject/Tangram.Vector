@@ -58,7 +58,6 @@ namespace Coin.API.Services
 
             Members = new ConcurrentDictionary<ulong, string>();
 
-            SetPublicKey().GetAwaiter();
             SetNodeIdentity();
 
             cancellationTokenSource = new CancellationTokenSource();
@@ -368,17 +367,21 @@ namespace Coin.API.Services
         /// 
         /// </summary>
         /// <returns></returns>
-        private async Task SetPublicKey()
+        private async Task<byte[]> GetPublicKey()
         {
+            byte[] publicKey = null;
+
             try
             {
                 var hiddenServiceDetails = await onionServiceClient.GetHiddenServiceDetailsAsync();
-                PublicKey = hiddenServiceDetails.PublicKey;
+                publicKey = hiddenServiceDetails.PublicKey;
             }
             catch (Exception ex)
             {
                 logger.LogError($"<<< HttpService.SetPublicKey >>>: {ex.ToString()}");
             }
+
+            return publicKey;
         }
 
         /// <summary>
@@ -388,6 +391,7 @@ namespace Coin.API.Services
         {
             try
             {
+                PublicKey = GetPublicKey().GetAwaiter().GetResult();
                 NodeIdentity = Util.HashToId(PublicKey.ToHex());
             }
             catch (Exception ex)

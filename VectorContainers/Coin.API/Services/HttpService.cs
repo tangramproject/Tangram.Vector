@@ -29,6 +29,7 @@ namespace Coin.API.Services
     public class HttpService : IHttpService
     {
         public ulong NodeIdentity { get; private set; }
+        public byte[] PublicKey { get; private set; }
         public string GatewayUrl { get; private set; }
         public ConcurrentDictionary<ulong, string> Members { get; private set; }
 
@@ -57,6 +58,7 @@ namespace Coin.API.Services
 
             Members = new ConcurrentDictionary<ulong, string>();
 
+            SetPublicKey().GetAwaiter();
             SetNodeIdentity();
 
             cancellationTokenSource = new CancellationTokenSource();
@@ -108,28 +110,6 @@ namespace Coin.API.Services
             }
 
             return hostName;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public async Task<byte[]> GetPublicKey()
-        {
-            byte[] publicKey = null;
-
-            try
-            {
-                var hiddenServiceDetails = await onionServiceClient.GetHiddenServiceDetailsAsync();
-                publicKey = hiddenServiceDetails.PublicKey;
-
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< HttpService.GetPublicKey >>>: {ex.ToString()}");
-            }
-
-            return publicKey;
         }
 
         /// <summary>
@@ -383,6 +363,24 @@ namespace Coin.API.Services
             return peer;
         }
 
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private async Task SetPublicKey()
+        {
+            try
+            {
+                var hiddenServiceDetails = await onionServiceClient.GetHiddenServiceDetailsAsync();
+                PublicKey = hiddenServiceDetails.PublicKey;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< HttpService.SetPublicKey >>>: {ex.ToString()}");
+            }
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -390,7 +388,7 @@ namespace Coin.API.Services
         {
             try
             {
-                NodeIdentity = Util.HashToId(GetPublicKey().GetAwaiter().GetResult().ToHex());
+                NodeIdentity = Util.HashToId(PublicKey.ToHex());
             }
             catch (Exception ex)
             {

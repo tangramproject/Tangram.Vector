@@ -30,7 +30,6 @@ namespace Coin.API.Actors
         private Config Config;
 
         private LastInterpretedMessage lastInterpretedMessage;
-        private byte[] publicKey;
         private IActorRef jobActor;
         private IActorRef atLeastOnceDeliveryActor;
 
@@ -91,17 +90,6 @@ namespace Coin.API.Actors
                 Graph = new Graph(Config);
 
                 Graph.BlockmaniaInterpreted += (sender, e) => BlockmaniaCallback(sender, e).SwallowException();
-
-                try
-                {
-                    publicKey = await httpService.GetPublicKey();
-                }
-                catch (Exception ex)
-                {
-                    logger.Error($"<<< BoostGraphActor.Register >>>: {ex.ToString()}");
-                    Shutdown(new HashedMessage(Id), "Public key not found.");
-                    return;
-                }
             }
 
             await InitializeBlocks(message);
@@ -362,7 +350,7 @@ namespace Coin.API.Actors
                     node = httpService.NodeIdentity;
                 }
 
-                var signed = await signingActorProvider.Sign(new SignedBlockGraphMessage(node, blockGraph, round, publicKey));
+                var signed = await signingActorProvider.Sign(new SignedBlockGraphMessage(node, blockGraph, round, httpService.PublicKey));
                 var prev = await unitOfWork.BlockGraph.GetPrevious(signed.Block.Hash, node, round);
 
                 if (prev != null)

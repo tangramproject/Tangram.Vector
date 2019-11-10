@@ -11,6 +11,7 @@ namespace Coin.API.Services
     {
         ITorClient GetTorClient();
         ulong NodeIdentity { get; }
+        byte[] PublicKey { get; }
         string GatewayUrl { get; }
         ConcurrentDictionary<ulong, string> Members { get; }
         Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory);
@@ -21,7 +22,6 @@ namespace Coin.API.Services
         Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory, string[] args);
         Task<IEnumerable<string>> GetMembers();
         string GetHostName();
-        Task<byte[]> GetPublicKey();
         Task<List<KeyValuePair<ulong, string>>> GetMemberIdentities();
         KeyValuePair<ulong, string> GetFullNodeIdentity(HttpResponseMessage response);
         IdentityProto GetIdentity(ulong peer);

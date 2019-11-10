@@ -8,6 +8,7 @@ using Core.API.Onion;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MihaZupan;
+using Core.API.Helper;
 
 namespace Coin.API.StartupExtensions
 {
@@ -113,18 +114,13 @@ namespace Coin.API.StartupExtensions
                 .AddPolicyHandler((services, request) =>
                 {
                     var logger = services.GetService<ILogger<Startup>>();
+                    var httpService = services.GetService<IHttpService>();
 
-                    if (request.Method == HttpMethod.Get)
-                    {
-                        return Core.API.Helper.PollyEx.GetRetryPolicyAsync(logger);
-                    }
+                    request.Headers.Add("x-pub", httpService.PublicKey.ToHex());
 
-                    if (request.Method == HttpMethod.Post)
-                    {
-                        return Core.API.Helper.PollyEx.GetNoOpPolicyAsync();
-                    }
-
-                    return Core.API.Helper.PollyEx.GetRetryPolicy();
+                    return request.Method == HttpMethod.Get
+                        ? PollyEx.GetRetryPolicyAsync(logger)
+                        : PollyEx.GetNoOpPolicyAsync();
                 });
 
             return services;

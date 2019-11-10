@@ -337,9 +337,9 @@ namespace Coin.API.Services
                 if (success)
                 {
                     var identity = Util.DeserializeProto<IdentityProto>(payload.Payload);
-                    if (!identity.Server.Equals(NodeIdentity))
+                    if (!identity.Client.Equals(NodeIdentity))
                     {
-                        logger.LogError($"Node: Mismatched server field in identity: expected {NodeIdentity}, got {identity.Server}");
+                        logger.LogError($"Node: Mismatched client identity field: expected {NodeIdentity}, got {identity.Client}");
                         return default;
                     }
 

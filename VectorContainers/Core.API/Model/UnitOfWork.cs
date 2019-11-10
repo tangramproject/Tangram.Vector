@@ -11,6 +11,8 @@ namespace Core.API.Model
         public IMessageRepository Message { get; private set; }
         public IJobRepository Job { get; private set; }
         public IInterpretedRepository Interpreted { get; private set; }
+        public IStampRepository Stamp { get; private set; }
+        public ICacheRepository Cache { get; private set; }
 
         public IDocumentStore Document { get; }
 
@@ -23,6 +25,8 @@ namespace Core.API.Model
             Message = new MessageRepository(dbContext, logger);
             Job = new JobRepository(dbContext, logger);
             Interpreted = new InterpretedRepository(dbContext, logger);
+            Stamp = new StampRepository(dbContext, logger);
+            Cache = new CacheRepository(dbContext, logger);
         }
     }
 }

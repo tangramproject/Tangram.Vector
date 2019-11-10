@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Core.API.Consensus;
 using Microsoft.Extensions.Logging;
 
 namespace Core.API.Model
@@ -16,32 +17,6 @@ namespace Core.API.Model
         {
             this.dbContext = dbContext;
             this.logger = logger;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        public Task<JobProto> Get(string hash)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentOutOfRangeException(nameof(hash));
-
-            var jobs = Enumerable.Empty<JobProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                jobs = session.Query<JobProto>().Where(x => x.Hash.Equals(hash)).ToList();
-
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< JobRepository.Get >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(jobs.FirstOrDefault());
         }
 
         /// <summary>
@@ -79,32 +54,9 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
-        /// <returns></returns>
-        public Task<IEnumerable<JobProto>> GetStatusMany(JobState state)
-        {
-            var jobs = Enumerable.Empty<JobProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                jobs = session.Query<JobProto>()
-                    .Where(x => x.Status == state)
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< JobRepository.GetStatusMany >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(jobs);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
         /// <param name="job"></param>
         /// <returns></returns>
-        public Task<bool> SetStatus(JobProto job, JobState state)
+        public Task<bool> SetState(JobProto job, JobState state)
         {
             if (job == null)
                 throw new ArgumentNullException(nameof(job));
@@ -128,6 +80,41 @@ namespace Core.API.Model
             }
 
             return Task.FromResult(result);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="hashes"></param>
+        /// <param name="state"></param>
+        /// <returns></returns>
+        public async Task SetStates(IEnumerable<string> hashes, JobState state)
+        {
+            if (hashes == null)
+                throw new ArgumentNullException(nameof(hashes));
+
+            try
+            {
+                if (hashes.Any() != true)
+                    return;
+
+                foreach (var next in hashes)
+                {
+                    var jobProto = await GetFirstOrDefault(x => x.Hash.Equals(next));
+                    if (jobProto != null)
+                    {
+                        jobProto.Status = state;
+
+                        var saved = await StoreOrUpdate(jobProto, jobProto.Id);
+                        if (saved == null)
+                            throw new Exception($"Could not update job {jobProto.Id}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< BoostGraphActor.MarkAs >>>: {ex.ToString()}");
+            }
         }
     }
 }

@@ -54,6 +54,7 @@ namespace Core.API.Model
                 if (interpreted != null)
                 {
                     round = interpreted.Round;
+                    round = round > 0 ? round - 1 : round;
                 }
             }
             catch (Exception ex)

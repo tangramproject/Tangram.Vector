@@ -44,17 +44,21 @@ namespace MessagePool.API.Services
 
                 if (msg != null)
                 {
-                    var hash = Core.API.LibSodium.Cryptography.GenericHashNoKey(message);
-                    var signed = await onionServiceClient.SignHashAsync(hash);
+                    //var hash = Core.API.LibSodium.Cryptography.GenericHashNoKey(message);
+                    //var signed = await onionServiceClient.SignHashAsync(hash);
+
+                    //Broadcast(message);
+
+                    //return Util.SerializeProto(new MessageSignedBlockProto
+                    //{
+                    //    Hash = hash.ToHex(),
+                    //    PublicKey = signed.PublicKey.ToHex(),
+                    //    Signature = signed.Signature.ToHex()
+                    //});
 
                     Broadcast(message);
 
-                    return Util.SerializeProto(new MessageSignedBlockProto
-                    {
-                        Hash = hash.ToHex(),
-                        PublicKey = signed.PublicKey.ToHex(),
-                        Signature = signed.Signature.ToHex()
-                    });
+                    return message;
                 }
             }
             catch (Exception ex)
@@ -79,7 +83,7 @@ namespace MessagePool.API.Services
 
             try
             {
-                var messages = await unitOfWork.Message.GetMany(key);
+                var messages = await unitOfWork.Message.GetWhere(x => x.Address.Equals(key));
                 if (messages?.Any() == true)
                 {
                     result = Util.SerializeProto(messages);
@@ -109,7 +113,7 @@ namespace MessagePool.API.Services
 
             try
             {
-                var messages = await unitOfWork.Message.GetMany(key);
+                var messages = await unitOfWork.Message.GetWhere(x => x.Address.Equals(key));
                 if (messages?.Any() == true)
                 {
                     result = Util.SerializeProto(messages.Skip(skip).Take(take));

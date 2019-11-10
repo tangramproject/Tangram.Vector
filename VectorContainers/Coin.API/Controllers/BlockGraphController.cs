@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Coin.API.ActorProviders;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
@@ -16,13 +17,16 @@ namespace Coin.API.Controllers
     {
         private readonly IBlockGraphService blockGraphService;
         private readonly IHttpService httpService;
+        private readonly INetworkActorProvider networkProvider;
         private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
 
-        public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService, IUnitOfWork unitOfWork, ILogger<BlockGraphController> logger)
+        public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService,
+            INetworkActorProvider networkProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphController> logger)
         {
             this.blockGraphService = blockGraphService;
             this.httpService = httpService;
+            this.networkProvider = networkProvider;
             this.unitOfWork = unitOfWork;
             this.logger = logger;
         }
@@ -40,9 +44,9 @@ namespace Coin.API.Controllers
             try
             {
                 var blockGrpahProto = Util.DeserializeProto<BlockGraphProto>(blockGraph);
-                var proto = await blockGraphService.AddBlockGraph(blockGrpahProto);
+                var block = await blockGraphService.SetBlockGraph(blockGrpahProto);
 
-                return new ObjectResult(new { protobuf = Util.SerializeProto(proto) });
+                return new ObjectResult(new { protobuf = Util.SerializeProto(block) });
             }
             catch (Exception ex)
             {
@@ -71,7 +75,7 @@ namespace Coin.API.Controllers
 
                     for (int i = 0; i < blockGraphProtos.Count(); i++)
                     {
-                        var added = await blockGraphService.AddBlockGraph(blockGraphProtos.ElementAt(i));
+                        var added = await blockGraphService.SetBlockGraph(blockGraphProtos.ElementAt(i));
                         if (added != null)
                         {
                             var next = blockGraphProtos.ElementAt(i);
@@ -101,7 +105,7 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockHeight = await blockGraphService.BlockHeight();
+                var blockHeight = await networkProvider.BlockHeight();
                 return new ObjectResult(new { height = blockHeight });
             }
             catch (Exception ex)
@@ -123,7 +127,7 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockHeight = await blockGraphService.NetworkBlockHeight();
+                var blockHeight = await networkProvider.NetworkBlockHeight();
                 return new ObjectResult(new { height = blockHeight });
             }
             catch (Exception ex)
@@ -147,7 +151,9 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockGraph = await unitOfWork.BlockGraph.GetMany(hash, httpService.NodeIdentity, (ulong)round);
+                var blockGraph = await unitOfWork.BlockGraph
+                    .GetWhere(x => x.Block.Hash.Equals(hash) && x.Block.Node.Equals(httpService.NodeIdentity) && x.Block.Round.Equals(round));
+
                 return new ObjectResult(new { protobuf = Util.SerializeProto(blockGraph) });
             }
             catch (Exception ex)
@@ -169,12 +175,38 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var id = await httpService.GetPublicKey();
-                return new ObjectResult(new { identity = id });
+                var pubKey = Request.Headers["x-pub"];
+                var peer = Util.HashToId(pubKey.First());
+                var identity = httpService.GetIdentity(peer);
+                var signedPayload = await httpService.SignPayload(identity);
+
+                return new ObjectResult(new { identity = Util.SerializeProto(signedPayload) });
             }
             catch (Exception ex)
             {
                 logger.LogError($"<<< Identity - Controller >>>: {ex.ToString()}");
+            }
+
+            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("interpreted", Name = "Interpreted")]
+        [ProducesResponseType(typeof(byte[]), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Interpreted()
+        {
+            try
+            {
+                var interpreted = await unitOfWork.Interpreted.Get();
+                return new ObjectResult(new { interpreted = Util.SerializeProto(interpreted) });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Interpreted - Controller >>>: {ex.ToString()}");
             }
 
             return new StatusCodeResult(StatusCodes.Status500InternalServerError);

@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Coin.API.Services;
 using Core.API.Helper;
 using Core.API.Model;
-using Core.API.Onion;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -20,14 +19,12 @@ namespace Coin.API.Providers
 
         private readonly IUnitOfWork unitOfWork;
         private readonly IHttpService httpService;
-        private readonly ITorClient torClient;
         private readonly ILogger logger;
 
-        public MissingBlocksProvider(IUnitOfWork unitOfWork, IHttpService httpService, ITorClient torClient, ILogger<MissingBlocksProvider> logger)
+        public MissingBlocksProvider(IUnitOfWork unitOfWork, IHttpService httpService, ILogger<MissingBlocksProvider> logger)
         {
             this.unitOfWork = unitOfWork;
             this.httpService = httpService;
-            this.torClient = torClient;
             this.logger = logger;
         }
 
@@ -35,11 +32,11 @@ namespace Coin.API.Providers
         {
             try
             {
-                var jobs = await unitOfWork.Job.GetStatusMany(JobState.Queued);
+                var jobs = await unitOfWork.Job.GetWhere(x => x.Status == JobState.Queued);
 
                 foreach (var next in jobs)
                 {
-                    var jobProto = await unitOfWork.Job.Get(next.Hash);
+                    var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(next.Hash));
                     if (jobProto != null)
                     {
                         // Future switch on job states
@@ -72,20 +69,18 @@ namespace Coin.API.Providers
             var allTasks = new List<Task<HttpResponseMessage>>();
             var blocks = new ConcurrentDictionary<ulong, BlockGraphProto>();
 
-            var jobs = await unitOfWork.Job.GetStatusMany(JobState.Queued);
+            var jobs = await unitOfWork.Job.GetWhere(x => x.Status == JobState.Queued);
             foreach (var job in jobs)
             {
                 await MarkAs(job, JobState.Dialling);
 
                 foreach (var member in httpService.Members)
                 {
-                    var uri = new Uri(new Uri(member.Value), $"mempool/{job.BlockGraph.Block.Hash}/{job.BlockGraph.Block.Round}");
-
                     allTasks.Add(Task.Run(async () =>
                     {
                         HttpResponseMessage response = null;
 
-                        response = await torClient.GetAsync(uri, new CancellationToken());
+                        response = await httpService.Dial(DialType.Get, member.Value, $"mempool/{job.BlockGraph.Block.Hash}/{job.BlockGraph.Block.Round}");
                         response.EnsureSuccessStatusCode();
 
                         var jToken = Util.ReadJToken(response, "protobuf");
@@ -133,7 +128,8 @@ namespace Coin.API.Providers
             try
             {
                 var payload = blocks.Select(k => k.Value);
-                var response = await torClient.PostAsJsonAsync($"{httpService.GatewayUrl}/blockgraphs", Util.SerializeProto(payload));
+
+                var response = await httpService.Dial($"{httpService.GatewayUrl}/blockgraphs", Util.SerializeProto(payload));
                 if (response.IsSuccessStatusCode)
                 {
                     var jToken = Util.ReadJToken(response, "protobufs");
@@ -150,14 +146,14 @@ namespace Coin.API.Providers
                                 foreach (var next in group)
                                 {
                                     var hash = next.FirstOrDefault().Value.Block.Hash;
-                                    var jobProto = await unitOfWork.Job.Get(hash);
+                                    var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(hash));
                                     if (jobProto != null)
                                     {
                                         jobProto.Status = JobState.Answered;
 
                                         next.ForEach((k) =>
                                         {
-                                            HierarchicalDataProvider.AddDependency(jobProto.BlockGraph, k.Value);
+                                            BlockGraphProto.AddDependency(jobProto.BlockGraph, k.Value);
                                         });
 
                                         jobProto.TotalNodes = next.Count();
@@ -202,7 +198,7 @@ namespace Coin.API.Providers
             {
                 foreach (var next in blocks)
                 {
-                    var jobProto = await unitOfWork.Job.Get(next.Value.Block.Hash);
+                    var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(next.Value.Block.Hash));
                     if (jobProto != null)
                     {
                         await MarkAs(jobProto, JobState.Queued);
@@ -232,7 +228,7 @@ namespace Coin.API.Providers
                     return;
                 }
 
-                var jobProto = await unitOfWork.Job.Get(job.Hash);
+                var jobProto = await unitOfWork.Job.GetFirstOrDefault(x => x.Hash.Equals(job.Hash));
                 if (jobProto != null)
                 {
                     jobProto.Status = state;

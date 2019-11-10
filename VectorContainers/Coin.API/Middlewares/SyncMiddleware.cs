@@ -17,7 +17,7 @@ namespace Coin.API.Middlewares
 
         public async Task Invoke(HttpContext httpContext, SyncProvider syncProvider)
         {
-            httpContext.Response.OnStarting(async state =>
+            httpContext.Response.OnStarting(state =>
             {
                 if (!syncProvider.IsSynchronized)
                 {
@@ -30,7 +30,6 @@ namespace Coin.API.Middlewares
                     {
                         httpContext.Response.Headers.Add("X-Response-Synchronized", new string[] { "false" });
                         httpContext.Response.StatusCode = StatusCodes.Status204NoContent;
-                        await httpContext.Response.WriteAsync("Node out of sync");
 
                         if (!syncProvider.IsRunning)
                         {
@@ -41,6 +40,9 @@ namespace Coin.API.Middlewares
                         }
                     }
                 }
+
+                return Task.CompletedTask;
+
             }, httpContext);
 
             await _next(httpContext);

@@ -21,56 +21,6 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        public Task<BlockIDProto> Get(string hash)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentNullException(nameof(hash));
-
-            BlockIDProto blockID = null;
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                blockID = session.Query<BlockIDProto>().FirstOrDefault(x => x.SignedBlock.Coin.Hash.Equals(hash));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockIDRepository.Get >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockID);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        public Task<IEnumerable<BlockIDProto>> GetMany(string hash)
-        {
-            if (string.IsNullOrEmpty(hash))
-                throw new ArgumentNullException(nameof(hash));
-
-            var blockIDs = Enumerable.Empty<BlockIDProto>();
-
-            try
-            {
-                using var session = dbContext.Document.OpenSession();
-                blockIDs = session.Query<BlockIDProto>().Where(x => x.SignedBlock.Coin.Hash.Equals(hash)).ToList();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< BlockIDRepository.GetMany >>>: {ex.ToString()}");
-            }
-
-            return Task.FromResult(blockIDs);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
         /// <param name="skip"></param>
         /// <param name="take"></param>
         /// <returns></returns>
@@ -102,7 +52,7 @@ namespace Core.API.Model
         /// </summary>
         /// <param name="hash"></param>
         /// <returns></returns>
-        public Task<bool> HasCoin(string hash)
+        public Task<bool> HasCoin(string hash, int version)
         {
             if (string.IsNullOrEmpty(hash))
                 throw new ArgumentNullException(nameof(hash));
@@ -113,7 +63,9 @@ namespace Core.API.Model
             {
                 using var session = dbContext.Document.OpenSession();
 
-                var coin = session.Query<BlockIDProto>().FirstOrDefault(x => x.SignedBlock.Coin.Commitment.Equals(hash));
+                var coin = session.Query<BlockIDProto>()
+                    .FirstOrDefault(x => x.SignedBlock.Coin.Stamp.Equals(hash) && x.SignedBlock.Coin.Version.Equals(version));
+
                 exists = coin != null;
             }
             catch (Exception ex)

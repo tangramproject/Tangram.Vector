@@ -87,10 +87,8 @@ namespace Core.API.Model
 
             try
             {
-                using (var session = Document.OpenSession())
-                {
-                    values = session.Query<TValue>().ToList();
-                }
+                using var session = Document.OpenSession();
+                values = session.Query<TValue>().ToList();
             }
             catch (Exception ex)
             {
@@ -138,7 +136,7 @@ namespace Core.API.Model
 
         public void Dispose()
         {
-            if(Document != null)
+            if (Document != null)
             {
                 Document.Dispose();
             }

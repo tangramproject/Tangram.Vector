@@ -5,11 +5,17 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Coin.API.ActorProviders;
+using Core.API.Consensus;
 using Core.API.Helper;
+using Core.API.LibSodium;
 using Core.API.Membership;
+using Core.API.Messages;
+using Core.API.Model;
 using Core.API.Onion;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 
 namespace Coin.API.Services
@@ -23,29 +29,47 @@ namespace Coin.API.Services
     public class HttpService : IHttpService
     {
         public ulong NodeIdentity { get; private set; }
+        public byte[] PublicKey { get; private set; }
         public string GatewayUrl { get; private set; }
         public ConcurrentDictionary<ulong, string> Members { get; private set; }
 
         private readonly IMembershipServiceClient membershipServiceClient;
         private readonly IOnionServiceClient onionServiceClient;
         private readonly ITorClient torClient;
+        private readonly ISigningActorProvider signingActorProvider;
+        private readonly BlockmainiaOptions blockmainiaOptions;
         private readonly ILogger logger;
 
-        public HttpService(IMembershipServiceClient membershipServiceClient, IOnionServiceClient onionServiceClient, ITorClient torClient, IConfiguration configuration, ILogger<HttpService> logger)
+        private CancellationTokenSource cancellationTokenSource;
+
+        public HttpService(IMembershipServiceClient membershipServiceClient, IOnionServiceClient onionServiceClient,
+            ITorClient torClient, ISigningActorProvider signingActorProvider, IConfiguration configuration,
+            IOptions<BlockmainiaOptions> blockmainiaOptions, ILogger<HttpService> logger)
         {
             this.membershipServiceClient = membershipServiceClient;
             this.onionServiceClient = onionServiceClient;
             this.torClient = torClient;
+            this.signingActorProvider = signingActorProvider;
+            this.blockmainiaOptions = blockmainiaOptions.Value;
             this.logger = logger;
 
             var gatewaySection = configuration.GetSection("Gateway");
             GatewayUrl = gatewaySection.GetValue<string>("Url");
 
             Members = new ConcurrentDictionary<ulong, string>();
-            NodeIdentity = Util.HostNameToHex(GetPublicKey().GetAwaiter().GetResult().ToHex());
 
-            MaintainMembers(new CancellationToken());
+            SetNodeIdentity();
+
+            cancellationTokenSource = new CancellationTokenSource();
+
+            MaintainMembers(cancellationTokenSource.Token);
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public ITorClient GetTorClient() => torClient;
 
         /// <summary>
         /// 
@@ -77,7 +101,7 @@ namespace Coin.API.Services
             try
             {
                 hostName = onionServiceClient.GetHiddenServiceDetailsAsync().GetAwaiter().GetResult().Hostname;
-                hostName = hostName.Substring(0, hostName.Length - 6);
+                hostName = hostName[0..^6];
             }
             catch (Exception ex)
             {
@@ -88,25 +112,38 @@ namespace Coin.API.Services
         }
 
         /// <summary>
+        /// Post
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="payload"></param>
+        /// <returns></returns>
+        public async Task<HttpResponseMessage> Dial(string address, object payload)
+        {
+            return (await Dial(DialType.Post, new string[] { address }, null, payload, null)).FirstOrDefault();
+        }
+
+        /// <summary>
         /// 
         /// </summary>
+        /// <param name="dialType"></param>
+        /// <param name="address"></param>
+        /// <param name="directory"></param>
         /// <returns></returns>
-        public async Task<byte[]> GetPublicKey()
+        public async Task<HttpResponseMessage> Dial(DialType dialType, string address, string directory)
         {
-            byte[] publicKey = null;
+            return (await Dial(dialType, new string[] { address }, directory, null, null)).FirstOrDefault();
+        }
 
-            try
-            {
-                var hiddenServiceDetails = await onionServiceClient.GetHiddenServiceDetailsAsync();
-                publicKey = hiddenServiceDetails.PublicKey;
-
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< HttpService.GetPublicKey >>>: {ex.ToString()}");
-            }
-
-            return publicKey;
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dialType"></param>
+        /// <param name="addresses"></param>
+        /// <param name="directory"></param>
+        /// <returns></returns>
+        public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, IEnumerable<string> addresses, string directory)
+        {
+            return await Dial(dialType, addresses, directory, null, null);
         }
 
         /// <summary>
@@ -117,7 +154,7 @@ namespace Coin.API.Services
         /// <returns></returns>
         public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory)
         {
-            return await Dial(dialType, directory, null, null);
+            return await Dial(dialType, await GetMembers(), directory, null, null);
         }
 
         /// <summary>
@@ -129,7 +166,7 @@ namespace Coin.API.Services
         /// <returns></returns>
         public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory, object payload)
         {
-            return await Dial(dialType, directory, payload, null);
+            return await Dial(dialType, await GetMembers(), directory, payload, null);
         }
 
         /// <summary>
@@ -141,7 +178,51 @@ namespace Coin.API.Services
         /// <returns></returns>
         public async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory, string[] args)
         {
-            return await Dial(dialType, directory, null, args);
+            return await Dial(dialType, await GetMembers(), directory, null, args);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="peer"></param>
+        /// <returns></returns>
+        public IdentityProto GetIdentity(ulong peer)
+        {
+            return new IdentityProto
+            {
+                Client = peer,
+                Nonce = Cryptography.RandomBytes(36),
+                Server = NodeIdentity,
+                Timestamp = DateTimeOffset.UtcNow.Ticks
+            };
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public async Task<PayloadProto> SignPayload(object value)
+        {
+            Core.API.Models.SignedHashResponse signedHashResponse;
+            string agent = "tgm/0.0.1";
+            byte[] payload;
+
+            if (value is IdentityProto)
+            {
+                payload = Util.SerializeProto((IdentityProto)value);
+                signedHashResponse = await signingActorProvider.Sign(new SignedHashMessage(payload));
+
+                return new PayloadProto
+                {
+                    Agent = agent,
+                    Payload = payload,
+                    PublicKey = signedHashResponse.PublicKey,
+                    Signature = signedHashResponse.Signature
+                };
+            }
+
+            return default;
         }
 
         /// <summary>
@@ -162,14 +243,13 @@ namespace Coin.API.Services
                         continue;
                     }
 
-                    var host = $"{response.RequestMessage.RequestUri.Scheme}://{response.RequestMessage.RequestUri.Host}:{response.RequestMessage.RequestUri.Port}";
-                    var jToken = Util.ReadJToken(response, "identity");
-                    var byteArray = Convert.FromBase64String(jToken.Value<string>());
-
-                    if (byteArray.Length <= 32)
+                    var peer = await VerifyPeer(response);
+                    if (string.IsNullOrEmpty(peer.Value))
                     {
-                        memberList.Add(KeyValuePair.Create(Util.HostNameToHex(byteArray.ToHex()), host));
+                        continue;
                     }
+
+                    memberList.Add(peer);
                 }
             }
             catch (Exception ex)
@@ -178,6 +258,147 @@ namespace Coin.API.Services
             }
 
             return memberList;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="node"></param>
+        /// <returns></returns>
+        public async Task<KeyValuePair<ulong, string>> GetMemberIdentity(ulong node)
+        {
+            var peer = new KeyValuePair<ulong, string>();
+
+            try
+            {
+                var member = Members.FirstOrDefault(m => m.Key.Equals(node));
+                if (string.IsNullOrEmpty(member.Value))
+                {
+                    return default;
+                }
+
+                var response = await Dial(DialType.Get, member.Value, "identity");
+                if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+                {
+                    return default;
+                }
+
+                peer = await VerifyPeer(response);
+                if (string.IsNullOrEmpty(peer.Value))
+                {
+                    return default;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< HttpService.GetMemberIdentity >>>: {ex.ToString()}");
+            }
+
+            return peer;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
+        /// <returns></returns>
+        public KeyValuePair<ulong, string> GetFullNodeIdentity(HttpResponseMessage response)
+        {
+            if (response == null)
+                throw new ArgumentNullException(nameof(response));
+
+            var scheme = response.RequestMessage.RequestUri.Scheme;
+            var authority = response.RequestMessage.RequestUri.Authority;
+            var identity = Members.FirstOrDefault(k => k.Value.Equals($"{scheme}://{authority}"));
+
+            return identity;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
+        /// <returns></returns>
+        public async Task<KeyValuePair<ulong, string>> VerifyPeer(HttpResponseMessage response)
+        {
+            if (response == null)
+                throw new ArgumentNullException(nameof(response));
+
+            var peer = new KeyValuePair<ulong, string>();
+            var host = $"{response.RequestMessage.RequestUri.Scheme}://{response.RequestMessage.RequestUri.Host}:{response.RequestMessage.RequestUri.Port}";
+            var jToken = Util.ReadJToken(response, "identity");
+            var byteArray = Convert.FromBase64String(jToken.Value<string>());
+
+            if (byteArray.Length > 0)
+            {
+                var payload = Util.DeserializeProto<PayloadProto>(byteArray);
+
+                var success = await signingActorProvider.VerifiySignature(new VerifiySignatureMessage(payload.Signature, payload.Payload, payload.PublicKey));
+                if (success)
+                {
+                    var identity = Util.DeserializeProto<IdentityProto>(payload.Payload);
+                    if (!identity.Client.Equals(NodeIdentity))
+                    {
+                        logger.LogError($"Node: Mismatched client identity field: expected {NodeIdentity}, got {identity.Client}");
+                        return default;
+                    }
+
+                    var diff = DateTime.UtcNow.Subtract(new TimeSpan(identity.Timestamp)).Ticks;
+                    if (diff < 0)
+                    {
+                        diff = -diff;
+                    }
+
+                    if (diff > blockmainiaOptions.NonceExpiration)
+                    {
+                        logger.LogError($"Node: Timestamp in client identity is outside of the max clock skew range {diff}");
+                        return default;
+                    }
+
+                    return KeyValuePair.Create(Util.HashToId(payload.PublicKey.ToHex()), host);
+                }
+            }
+
+            return peer;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private async Task<byte[]> GetPublicKey()
+        {
+            byte[] publicKey = null;
+
+            try
+            {
+                var hiddenServiceDetails = await onionServiceClient.GetHiddenServiceDetailsAsync();
+                publicKey = hiddenServiceDetails.PublicKey;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< HttpService.SetPublicKey >>>: {ex.ToString()}");
+            }
+
+            return publicKey;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private void SetNodeIdentity()
+        {
+            try
+            {
+                PublicKey = GetPublicKey().GetAwaiter().GetResult();
+                NodeIdentity = Util.HashToId(PublicKey.ToHex());
+            }
+            catch (Exception ex)
+            {
+                logger.LogCritical($"<<< HttpService.SetNodeIdentity >>>: {ex.ToString()}");
+                Environment.Exit(1);
+            }
         }
 
         /// <summary>
@@ -218,15 +439,14 @@ namespace Coin.API.Services
         /// <param name="directory"></param>
         /// <param name="args"></param>
         /// <returns></returns>
-        private async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, string directory, object payload, string[] args)
+        private async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, IEnumerable<string> addresses, string directory, object payload, string[] args)
         {
             var dialTasks = new List<Task<HttpResponseMessage>>();
             var responseTasks = new List<Task<HttpResponseMessage>>();
 
             try
             {
-                var members = await GetMembers();
-                foreach (var member in members)
+                foreach (var address in addresses)
                 {
                     dialTasks.Add(Task.Run(() =>
                     {
@@ -239,7 +459,7 @@ namespace Coin.API.Services
 
                         Task<HttpResponseMessage> response = null;
 
-                        var uri = new Uri(new Uri(member), path);
+                        var uri = new Uri(new Uri(address), path);
 
                         response = dialType switch
                         {
@@ -257,7 +477,10 @@ namespace Coin.API.Services
                 {
                     await Task.WhenAll(dialTasks.ToArray());
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    logger.LogError($"<<< HttpService.Dial >>>: {ex.ToString()}");
+                }
 
             }
             catch (Exception ex)
@@ -267,5 +490,46 @@ namespace Coin.API.Services
 
             return await Task.WhenAll(responseTasks);
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    if (cancellationTokenSource != null)
+                    {
+                        cancellationTokenSource.Cancel();
+                        cancellationTokenSource.Dispose();
+                        cancellationTokenSource = null;
+                    }
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~HttpService()
+        // {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
+        #endregion
     }
 }

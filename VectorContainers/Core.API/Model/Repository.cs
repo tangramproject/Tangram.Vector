@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Raven.Client.Documents;
 
 namespace Core.API.Model
 {
@@ -47,7 +47,7 @@ namespace Core.API.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< DbContext.StoreOrUpdate >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.StoreOrUpdate >>>: {ex.ToString()}");
             }
 
             return Task.FromResult<TValue>(default);
@@ -68,7 +68,7 @@ namespace Core.API.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< DbContext.LoadAll >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.LoadAll >>>: {ex.ToString()}");
             }
 
             for (int i = 0, valuesCount = values.Count(); i < valuesCount; i++)
@@ -93,7 +93,7 @@ namespace Core.API.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< DbContext.LoadAll >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.Load >>>: {ex.ToString()}");
             }
 
             return Task.FromResult(entity);
@@ -102,24 +102,73 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="entity"></param>
+        /// <param name="id"></param>
         /// <returns></returns>
-        public Task<bool> Delete(TEntity entity)
+        public Task<bool> Delete(string id)
         {
             bool result = false;
+
             try
             {
                 using var session = dbContext.Document.OpenSession();
+
+                var entity = session.Load<TEntity>(id);
+
                 session.Delete(entity);
+                session.SaveChanges();
 
                 result = true;
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< DbContext.LoadAll >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.Delete >>>: {ex.ToString()}");
             }
 
             return Task.FromResult(result);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns></returns>
+        public Task<TEntity> GetFirstOrDefault(Expression<Func<TEntity, bool>> expression)
+        {
+            TEntity entity = default;
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+                entity = session.Query<TEntity>().FirstOrDefault(expression);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Repository.GetFirstOrDefault >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(entity);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns></returns>
+        public Task<IEnumerable<TEntity>> GetWhere(Expression<Func<TEntity, bool>> expression)
+        {
+            var entities = Enumerable.Empty<TEntity>();
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+                entities = session.Query<TEntity>().Where(expression).ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Repository.GetWhere >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(entities);
         }
     }
 }

@@ -193,7 +193,7 @@ namespace Coin.API.Services
                 Client = peer,
                 Nonce = Cryptography.RandomBytes(36),
                 Server = NodeIdentity,
-                Timestamp = DateTimeOffset.UtcNow.Ticks
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             };
         }
 
@@ -343,15 +343,24 @@ namespace Coin.API.Services
                         return default;
                     }
 
-                    var diff = DateTime.UtcNow.Subtract(new TimeSpan(identity.Timestamp)).Ticks;
-                    if (diff < 0)
+                    try
                     {
-                        diff = -diff;
-                    }
+                        var dateTimeOffset = DateTimeOffset.FromUnixTimeSeconds(identity.Timestamp);
+                        var diff = DateTime.UtcNow.Subtract(dateTimeOffset.UtcDateTime).Ticks;
+                        if (diff < 0)
+                        {
+                            diff = -diff;
+                        }
 
-                    if (diff > blockmainiaOptions.NonceExpiration)
+                        if (diff > blockmainiaOptions.NonceExpiration)
+                        {
+                            logger.LogError($"Node: Timestamp in client identity is outside of the max clock skew range {diff}");
+                            return default;
+                        }
+                    }
+                    catch (Exception ex)
                     {
-                        logger.LogError($"Node: Timestamp in client identity is outside of the max clock skew range {diff}");
+                        logger.LogError($"<<< HttpService.VerifyPeer >>>: {ex.ToString()}");
                         return default;
                     }
 

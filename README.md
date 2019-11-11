@@ -10,7 +10,7 @@ dotnet publish TGMGateway --output TGMGateway/publish --configuration Release
 dotnet publish Coin.API --output Coin.API/publish --configuration Release
 dotnet publish MessagePool.API --output MessagePool.API/publish --configuration Release
 dotnet publish Onion.API --output Onion.API/publish --configuration Release
-dotnet publish Membeship.API --output Membeship.API/publish --configuration Release
+dotnet publish Membership.API --output Membership.API/publish --configuration Release
 ```
 
 ## After you build

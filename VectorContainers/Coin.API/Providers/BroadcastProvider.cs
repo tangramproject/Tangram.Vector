@@ -65,11 +65,13 @@ namespace Coin.API.Providers
                     .Where(member => !broadcasts.TryGetValue(member.Key, out CancellationTokenSource cancellation)).Select(member => member))
                 {
                     var cts = new CancellationTokenSource();
-                    Broadcast(member.Key, cts.Token);
                     if (!broadcasts.TryAdd(member.Key, cts))
                     {
                         logger.LogError($"<<< ReplyProvider.MaintainBroadcasts >>>: Failed adding {member.Key}");
+                        continue;
                     }
+
+                    Broadcast(member.Key, cts.Token);
                 }
 
                 foreach (var broadcast in broadcasts

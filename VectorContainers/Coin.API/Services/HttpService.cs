@@ -360,7 +360,7 @@ namespace Coin.API.Services
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError($"<<< HttpService.VerifyPeer >>>: {ex.ToString()}");
+                        logger.LogError($"<<< HttpService.VerifyPeer >>>: Max clock skew range {ex.ToString()}");
                         return default;
                     }
 
@@ -488,7 +488,7 @@ namespace Coin.API.Services
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError($"<<< HttpService.Dial >>>: {ex.ToString()}");
+                    logger.LogError($"<<< HttpService.Dial >>>: WhenAll dial tasks failed:  {ex.ToString()}");
                 }
 
             }
@@ -497,7 +497,18 @@ namespace Coin.API.Services
                 logger.LogError($"<<< HttpService.Dial >>>: {ex.ToString()}");
             }
 
-            return await Task.WhenAll(responseTasks);
+            var  responses = Enumerable.Empty<HttpResponseMessage>();
+
+            try
+            {
+                responses = await Task.WhenAll(responseTasks.ToArray());
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< HttpService.Dial >>>: WhenAll response tasks failed:  {ex.ToString()}");
+            }
+
+            return responses;
         }
 
         #region IDisposable Support

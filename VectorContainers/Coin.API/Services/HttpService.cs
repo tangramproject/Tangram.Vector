@@ -453,6 +453,7 @@ namespace Coin.API.Services
             var dialTasks = new List<Task<HttpResponseMessage>>();
             var responseTasks = new List<Task<HttpResponseMessage>>();
             int failed = 0;
+            int passed = 0;
 
             try
             {
@@ -472,20 +473,22 @@ namespace Coin.API.Services
                         Task<HttpResponseMessage> response = null;
                         try
                         {
-                            response = dialType switch
-                            {
-                                DialType.Get => torClient.GetAsync(uri, new CancellationToken()),
-                                _ => torClient.PostAsJsonAsync(uri, payload),
-                            };
+                            response = dialType == DialType.Get ? torClient.GetAsync(uri, new CancellationToken()) : torClient.PostAsJsonAsync(uri, payload);
 
-                            if (response.Status == TaskStatus.RanToCompletion)
+                            switch (response.Status)
                             {
-                                responseTasks.Add(response);
-                            }
-                            else if (response.Status == TaskStatus.Faulted)
-                            {
-                                Interlocked.Increment(ref failed);
-                                logger.LogError($"<<< HttpService.Dial >>>: Failed dial type ({dialType}) on address ({address})");
+                                case TaskStatus.RanToCompletion:
+                                    responseTasks.Add(response);
+                                    Interlocked.Increment(ref passed);
+                                    break;
+                                case TaskStatus.Canceled:
+                                    Interlocked.Increment(ref failed);
+                                    logger.LogError($"<<< HttpService.Dial >>>: Canceled dial type ({dialType}) on address ({address})");
+                                    break;
+                                case TaskStatus.Faulted:
+                                    Interlocked.Increment(ref failed);
+                                    logger.LogError($"<<< HttpService.Dial >>>: Faulted dial type ({dialType}) on address ({address})");
+                                    break;
                             }
                         }
                         catch (Exception)
@@ -505,35 +508,26 @@ namespace Coin.API.Services
                 }
                 catch (AggregateException)
                 {
-                    logger.LogError($"<<< HttpService.Dial >>>: {failed} dialling tasks failed.");
+                    logger.LogError($"<<< HttpService.Dial >>>: {addresses.Count()} dialling tasks: {passed} passed {failed} failed.");
                 }
 
                 if (dialling.Status != TaskStatus.RanToCompletion)
                 {
                     foreach (var dailTask in dialTasks)
                     {
-                        logger.LogError($"<<< HttpService.Dial >>>: Failed dial task {dailTask.Id}: {dailTask.Status}");
+                        if (dailTask.Status != TaskStatus.RanToCompletion)
+                        {
+                            logger.LogError($"<<< HttpService.Dial >>>: Failed dial task {dailTask.Id}: {dailTask.Status}");
+                        }
                     }
                 }
-
             }
             catch (Exception ex)
             {
                 logger.LogError($"<<< HttpService.Dial >>>: {ex.ToString()}");
             }
 
-            var responses = Enumerable.Empty<HttpResponseMessage>();
-
-            try
-            {
-                responses = await Task.WhenAll(responseTasks.ToArray());
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< HttpService.Dial >>>: WhenAll response tasks failed:  {ex.ToString()}");
-            }
-
-            return responses;
+            return await Task.WhenAll(responseTasks.ToArray());
         }
 
         #region IDisposable Support

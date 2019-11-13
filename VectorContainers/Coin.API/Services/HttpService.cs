@@ -240,6 +240,8 @@ namespace Coin.API.Services
                 {
                     if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     {
+                        var node = GetFullNodeIdentity(response);
+                        logger.LogError($"<<< HttpService.GetMemberIdentities >>>: No content {node.Value}");
                         continue;
                     }
 
@@ -450,84 +452,34 @@ namespace Coin.API.Services
         /// <returns></returns>
         private async Task<IEnumerable<HttpResponseMessage>> Dial(DialType dialType, IEnumerable<string> addresses, string directory, object payload, string[] args)
         {
-            var dialTasks = new List<Task<HttpResponseMessage>>();
-            var responseTasks = new List<Task<HttpResponseMessage>>();
-            int failed = 0;
-            int passed = 0;
+            var responses = new List<HttpResponseMessage>();
 
-            try
-            {
-                foreach (var address in addresses)
+            await Task.Factory.StartNew(() =>
+                Parallel.ForEach(addresses, (address) =>
                 {
-                    dialTasks.Add(Task.Run(() =>
+                    var path = directory;
+
+                    if (args != null)
                     {
-                        var path = directory;
-
-                        if (args != null)
-                        {
-                            path = string.Format("{0}{1}", directory, string.Join(string.Empty, args));
-                        }
-
-                        var uri = new Uri(new Uri(address), path);
-
-                        Task<HttpResponseMessage> response = null;
-                        try
-                        {
-                            response = dialType == DialType.Get ? torClient.GetAsync(uri, new CancellationToken()) : torClient.PostAsJsonAsync(uri, payload);
-
-                            switch (response.Status)
-                            {
-                                case TaskStatus.RanToCompletion:
-                                    responseTasks.Add(response);
-                                    Interlocked.Increment(ref passed);
-                                    break;
-                                case TaskStatus.Canceled:
-                                    Interlocked.Increment(ref failed);
-                                    logger.LogError($"<<< HttpService.Dial >>>: Canceled dial type ({dialType}) on address ({address})");
-                                    break;
-                                case TaskStatus.Faulted:
-                                    Interlocked.Increment(ref failed);
-                                    logger.LogError($"<<< HttpService.Dial >>>: Faulted dial type ({dialType}) on address ({address})");
-                                    break;
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            Interlocked.Increment(ref failed);
-                        }
-
-                        return response;
-                    }));
-                }
-
-                var dialling = Task.WhenAll(dialTasks.ToArray());
-
-                try
-                {
-                    dialling.Wait();
-                }
-                catch (AggregateException)
-                {
-                    logger.LogError($"<<< HttpService.Dial >>>: {addresses.Count()} dialling tasks: {passed} passed {failed} failed.");
-                }
-
-                if (dialling.Status != TaskStatus.RanToCompletion)
-                {
-                    foreach (var dailTask in dialTasks)
-                    {
-                        if (dailTask.Status != TaskStatus.RanToCompletion)
-                        {
-                            logger.LogError($"<<< HttpService.Dial >>>: Failed dial task {dailTask.Id}: {dailTask.Status}");
-                        }
+                        path = string.Format("{0}{1}", directory, string.Join(string.Empty, args));
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< HttpService.Dial >>>: {ex.ToString()}");
-            }
 
-            return await Task.WhenAll(responseTasks.ToArray());
+                    var uri = new Uri(new Uri(address), path);
+                    HttpResponseMessage response = null;
+
+                    try
+                    {
+                        response = dialType == DialType.Get ? torClient.GetAsync(uri, new CancellationToken()).Result : torClient.PostAsJsonAsync(uri, payload).Result;
+                        responses.Add(response);
+                    }
+                    catch (Exception)
+                    {
+                        logger.LogError($"<<< HttpService.Dial >>>: Failed dial uri {uri.AbsolutePath} on dial type {dialType}");
+                    }
+                })
+            );
+
+            return responses;
         }
 
         #region IDisposable Support

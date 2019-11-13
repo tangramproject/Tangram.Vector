@@ -466,17 +466,26 @@ namespace Coin.API.Services
                             path = string.Format("{0}{1}", directory, string.Join(string.Empty, args));
                         }
 
-                        Task<HttpResponseMessage> response = null;
-
                         var uri = new Uri(new Uri(address), path);
 
-                        response = dialType switch
+                        Task<HttpResponseMessage> response = null;
+                        try
                         {
-                            DialType.Get => torClient.GetAsync(uri, new CancellationToken()),
-                            _ => torClient.PostAsJsonAsync(uri, payload),
-                        };
+                            response = dialType switch
+                            {
+                                DialType.Get => torClient.GetAsync(uri, new CancellationToken()),
+                                _ => torClient.PostAsJsonAsync(uri, payload),
+                            };
 
-                        responseTasks.Add(response);
+                            if (response.IsCompletedSuccessfully)
+                            {
+                                responseTasks.Add(response);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError($"<<< HttpService.Dial >>>: Failed dial type ({dialType}) on address ({address})\n  {ex.ToString()}");
+                        }
 
                         return response;
                     }));
@@ -488,7 +497,7 @@ namespace Coin.API.Services
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError($"<<< HttpService.Dial >>>: WhenAll dial tasks failed:  {ex.ToString()}");
+                    logger.LogError($"<<< HttpService.Dial >>>: Some WhenAll dial tasks failed:  {ex.ToString()}");
                 }
 
             }
@@ -497,7 +506,7 @@ namespace Coin.API.Services
                 logger.LogError($"<<< HttpService.Dial >>>: {ex.ToString()}");
             }
 
-            var  responses = Enumerable.Empty<HttpResponseMessage>();
+            var responses = Enumerable.Empty<HttpResponseMessage>();
 
             try
             {

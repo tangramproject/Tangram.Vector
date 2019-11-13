@@ -452,6 +452,7 @@ namespace Coin.API.Services
         {
             var dialTasks = new List<Task<HttpResponseMessage>>();
             var responseTasks = new List<Task<HttpResponseMessage>>();
+            int failed = 0;
 
             try
             {
@@ -477,27 +478,42 @@ namespace Coin.API.Services
                                 _ => torClient.PostAsJsonAsync(uri, payload),
                             };
 
-                            if (response.IsCompletedSuccessfully)
+                            if (response.Status == TaskStatus.RanToCompletion)
                             {
                                 responseTasks.Add(response);
                             }
+                            else if (response.Status == TaskStatus.Faulted)
+                            {
+                                Interlocked.Increment(ref failed);
+                                logger.LogError($"<<< HttpService.Dial >>>: Failed dial type ({dialType}) on address ({address})");
+                            }
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
-                            logger.LogError($"<<< HttpService.Dial >>>: Failed dial type ({dialType}) on address ({address})\n  {ex.ToString()}");
+                            Interlocked.Increment(ref failed);
                         }
 
                         return response;
                     }));
                 }
 
+                var dialling = Task.WhenAll(dialTasks.ToArray());
+
                 try
                 {
-                    await Task.WhenAll(dialTasks.ToArray());
+                    dialling.Wait();
                 }
-                catch (Exception ex)
+                catch (AggregateException)
                 {
-                    logger.LogError($"<<< HttpService.Dial >>>: Some WhenAll dial tasks failed:  {ex.ToString()}");
+                    logger.LogError($"<<< HttpService.Dial >>>: {failed} dialling tasks failed.");
+                }
+
+                if (dialling.Status != TaskStatus.RanToCompletion)
+                {
+                    foreach (var dailTask in dialTasks)
+                    {
+                        logger.LogError($"<<< HttpService.Dial >>>: Failed dial task {dailTask.Id}: {dailTask.Status}");
+                    }
                 }
 
             }

@@ -24,7 +24,7 @@ namespace Membership.API
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                 .Enrich.FromLogContext()
                 .WriteTo.Console()
-                .WriteTo.File("membership.api.log", rollingInterval: RollingInterval.Day)
+                .WriteTo.File("membership.api.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 2)
                 .CreateLogger();
 
             try

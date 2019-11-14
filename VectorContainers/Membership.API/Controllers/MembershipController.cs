@@ -16,10 +16,10 @@ namespace Membership.API.Controllers
     public class MembershipController : Controller
     {
         private ISwimProtocolProvider _swimProtocolProvider;
-        private ISwimProtocol _swimProtocol;
+        private FailureDetectionProvider _swimProtocol;
         private ILogger _logger;
 
-        public MembershipController(ISwimProtocolProvider swimProtocolProvider, ISwimProtocol swimProtocol, ILogger<MembershipController> logger)
+        public MembershipController(ISwimProtocolProvider swimProtocolProvider, FailureDetectionProvider swimProtocol, ILogger<MembershipController> logger)
         {
             _swimProtocolProvider = swimProtocolProvider;
             _swimProtocol = swimProtocol;

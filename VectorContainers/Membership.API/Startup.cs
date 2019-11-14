@@ -148,9 +148,8 @@ namespace Membership.API
             });
 
             services.AddSingleton<ISwimProtocolProvider, SwimProtocolProvider>();
-            services.AddSingleton<ISwimProtocol, FailureDetection>();
-
-            services.AddHostedService<FailureDetection>();
+            services.AddSingleton<FailureDetectionProvider>();
+            services.AddHostedService<FailureDetectionService>();
         }
  
         public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)

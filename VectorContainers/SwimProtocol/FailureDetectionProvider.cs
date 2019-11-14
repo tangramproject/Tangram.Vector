@@ -21,7 +21,7 @@ using System.Timers;
 
 namespace SwimProtocol
 {
-    public class FailureDetection : BackgroundService, ISwimProtocol
+    public class FailureDetectionProvider : ISwimProtocol
     {
         private readonly StateMachine<SwimFailureDetectionState, SwimFailureDetectionTrigger> _stateMachine;
         private readonly ISwimProtocolProvider _swimProtocolProvider;
@@ -47,7 +47,7 @@ namespace SwimProtocol
 
         private const int Lambda = 3;
 
-        public FailureDetection(ISwimProtocolProvider swimProtocolProvider, IConfiguration configuration, ILogger<FailureDetection> logger)
+        public FailureDetectionProvider(ISwimProtocolProvider swimProtocolProvider, IConfiguration configuration, ILogger<FailureDetectionProvider> logger)
         {
             _stateMachine = new StateMachine<SwimFailureDetectionState, SwimFailureDetectionTrigger>(SwimFailureDetectionState.Idle);
             _swimProtocolProvider = swimProtocolProvider;
@@ -740,14 +740,6 @@ namespace SwimProtocol
             {
                 _stateMachine.Fire(trigger);
             }
-        }
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            await Task.Run(() =>
-            {
-                Start();
-            }, stoppingToken);
         }
 
         public SwimFailureDetectionState State

@@ -70,7 +70,7 @@ namespace SwimProtocol.Tests
         private readonly IConfiguration _configuration;
         private readonly LoggerFactory _loggerFactory;
 
-        private readonly ILogger<FailureDetection> _logger;
+        private readonly ILogger<FailureDetectionProvider> _logger;
 
 
         public void Init()
@@ -87,7 +87,7 @@ namespace SwimProtocol.Tests
 
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddProvider(new XunitLoggerProvider(output));
-            _logger = loggerFactory.CreateLogger<FailureDetection>();
+            _logger = loggerFactory.CreateLogger<FailureDetectionProvider>();
         }
 
         [Fact]
@@ -98,7 +98,7 @@ namespace SwimProtocol.Tests
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddProvider(new XunitLoggerProvider(_output));
 
-            var swimProtocol = new FailureDetection(protocolProvider, _configuration, loggerFactory.CreateLogger<FailureDetection>());
+            var swimProtocol = new FailureDetectionProvider(protocolProvider, _configuration, loggerFactory.CreateLogger<FailureDetectionProvider>());
 
             swimProtocol.OnTransitioned((action) =>
             {
@@ -126,7 +126,7 @@ namespace SwimProtocol.Tests
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddProvider(new XunitLoggerProvider(_output));
 
-            var swimProtocol = new FailureDetection(protocolProvider, _configuration, loggerFactory.CreateLogger<FailureDetection>());
+            var swimProtocol = new FailureDetectionProvider(protocolProvider, _configuration, loggerFactory.CreateLogger<FailureDetectionProvider>());
 
             swimProtocol.OnTransitioned((action) =>
             {
@@ -157,7 +157,7 @@ namespace SwimProtocol.Tests
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddProvider(new XunitLoggerProvider(_output));
 
-            var swimProtocol = new FailureDetection(protocolProvider, _configuration, loggerFactory.CreateLogger<FailureDetection>());
+            var swimProtocol = new FailureDetectionProvider(protocolProvider, _configuration, loggerFactory.CreateLogger<FailureDetectionProvider>());
 
             swimProtocol.OnTransitioned((action) =>
             {
@@ -190,9 +190,9 @@ namespace SwimProtocol.Tests
             return new SwimProtocolProvider(node, _output);
         }
 
-        public static FailureDetection GenerateFailureDetection(SwimProtocolProvider provider, IConfiguration configuration, ILogger<FailureDetection> logger)
+        public static FailureDetectionProvider GenerateFailureDetection(SwimProtocolProvider provider, IConfiguration configuration, ILogger<FailureDetectionProvider> logger)
         {
-            return new FailureDetection(provider, configuration, logger);
+            return new FailureDetectionProvider(provider, configuration, logger);
         }
 
         [Fact]

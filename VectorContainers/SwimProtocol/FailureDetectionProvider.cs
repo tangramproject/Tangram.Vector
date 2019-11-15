@@ -333,6 +333,8 @@ namespace SwimProtocol
                 {
                     _activeNodeRwLock.EnterReadLock();
 
+                    bool receivedAck = false;
+
                     try
                     {
                         if (_stateMachine.State == SwimFailureDetectionState.Pinged)
@@ -342,19 +344,17 @@ namespace SwimProtocol
                                 if (ActiveNodeData.ReceivedAck)
                                 {
                                     _logger.LogInformation($"<<< RECEIVED ACK >>>");
+                                    receivedAck = true;
                                 }
                                 else
                                 {
                                     _logger.LogInformation($"<<< DIDNT RECEIVE ACK - PROCEEDING WITH PING REQ >>>");
+                                    receivedAck = false;
                                 }
-
-                                _stateMachine.Fire(!ActiveNodeData.ReceivedAck
-                                    ? SwimFailureDetectionTrigger.PingExpireNoResponse
-                                    : SwimFailureDetectionTrigger.PingExpireLive);
                             }
                             else
                             {
-                                _stateMachine.Fire(SwimFailureDetectionTrigger.PingExpireNoResponse);
+                                receivedAck = false;
                             }
                         }
                     }
@@ -362,6 +362,10 @@ namespace SwimProtocol
                     {
                         _activeNodeRwLock.ExitReadLock();
                     }
+
+                    _stateMachine.Fire(receivedAck
+                       ? SwimFailureDetectionTrigger.PingExpireLive
+                       : SwimFailureDetectionTrigger.PingExpireNoResponse);
                 }
             }
             catch (Exception ex)

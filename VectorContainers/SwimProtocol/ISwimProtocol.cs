@@ -5,5 +5,6 @@ namespace SwimProtocol
     public interface ISwimProtocol
     {
         IEnumerable<ISwimNode> Members { get; }
+        void ProtocolPeriodExpired();
     }
 }

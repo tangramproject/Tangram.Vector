@@ -28,9 +28,6 @@ namespace SwimProtocol
         private readonly IConfiguration _configuration;
         private readonly ILogger _logger;
 
-        private readonly System.Timers.Timer _protocolTimer;
-        private readonly System.Timers.Timer _pingTimer;
-
         private ConcurrentQueue<ISwimNode> _nodes { get; set; } = new ConcurrentQueue<ISwimNode>();
 
         private ConcurrentDictionaryEx<Ulid, MessageBase> CorrelatedMessages { get; set; } = new ConcurrentDictionaryEx<Ulid, MessageBase>(200);
@@ -56,20 +53,9 @@ namespace SwimProtocol
 
             _nodeRepository = new NodeRepository(swimProtocolProvider.Node.Hostname);
 
-            _protocolTimer = new System.Timers.Timer(7000);
-            _pingTimer = new System.Timers.Timer(3500);
-            _protocolTimer.AutoReset = false;
-            _pingTimer.AutoReset = false;
-            _protocolTimer.Elapsed += _protocolTimer_Elapsed;
-            _pingTimer.Elapsed += _pingTimer_Elapsed;
-
             _stateMachine.Configure(SwimFailureDetectionState.Idle)
                 .Permit(SwimFailureDetectionTrigger.Ping, SwimFailureDetectionState.Pinged)
-                .Ignore(SwimFailureDetectionTrigger.Reset)
-                .OnEntry((entryAction) =>
-                {
-                    Start();
-                });
+                .Ignore(SwimFailureDetectionTrigger.Reset);
 
             _stateMachine.Configure(SwimFailureDetectionState.Pinged)
                 .Permit(SwimFailureDetectionTrigger.PingExpireLive, SwimFailureDetectionState.Alive)
@@ -172,6 +158,8 @@ namespace SwimProtocol
             {
                 if (ActiveNode == null) return;
 
+                _logger.LogInformation("<<< NODE MARKED ALIVE >>>");
+
                 ActiveNode.SetStatus(SwimNodeStatus.Alive);
 
                 AddBroadcastMessage(new AliveMessage(Ulid.NewUlid(), _swimProtocolProvider.Node, ActiveNode));
@@ -186,6 +174,8 @@ namespace SwimProtocol
             lock (_activeNodeLock)
             {
                 if (ActiveNode == null) return;
+
+                _logger.LogInformation("<<< NODE MARKED SUSPECT >>>");
 
                 ActiveNode.SetStatus(SwimNodeStatus.Suspicious);
 
@@ -223,8 +213,6 @@ namespace SwimProtocol
             MarkDeadNodes();
             CleanupDeadNodes();
 
-            _protocolTimer.Start();
-
             if (ProtocolPeriodsComplete >= InitialNodeCount)
             {
                 ShuffleNodes();
@@ -234,7 +222,11 @@ namespace SwimProtocol
 
             PingNextNode();
 
-            _pingTimer.Start();
+            Thread.Sleep(3500);
+
+            _logger.LogInformation("Ping time has elapsed");
+
+            PingElapsed();
         }
 
         private void MarkDeadNodes()
@@ -290,18 +282,27 @@ namespace SwimProtocol
             }
         }
 
-        private void _pingTimer_Elapsed(object sender, ElapsedEventArgs e)
+        private void PingElapsed()
         {
             try
             {
                 lock (_stateMachineLock)
                 {
-                    if (_stateMachine.State == SwimFailureDetectionState.Pinged)
+                    lock (_activeNodeLock)
                     {
-                        lock (_activeNodeLock)
+                        if (_stateMachine.State == SwimFailureDetectionState.Pinged)
                         {
                             if (ActiveNodeData != null)
                             {
+                                if (ActiveNodeData.ReceivedAck)
+                                {
+                                    _logger.LogInformation($"<<< RECEIVED ACK >>>");
+                                }
+                                else
+                                {
+                                    _logger.LogInformation($"<<< DIDNT RECEIVE ACK - PROCEEDING WITH PING REQ >>>");
+                                }
+
                                 _stateMachine.Fire(!ActiveNodeData.ReceivedAck
                                     ? SwimFailureDetectionTrigger.PingExpireNoResponse
                                     : SwimFailureDetectionTrigger.PingExpireLive);
@@ -320,7 +321,7 @@ namespace SwimProtocol
             }
         }
 
-        private void _protocolTimer_Elapsed(object sender, ElapsedEventArgs e)
+        public void ProtocolPeriodExpired()
         {
             try
             {

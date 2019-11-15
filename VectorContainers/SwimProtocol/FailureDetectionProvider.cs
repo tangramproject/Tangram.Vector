@@ -33,8 +33,9 @@ namespace SwimProtocol
         private ConcurrentDictionaryEx<Ulid, MessageBase> CorrelatedMessages { get; set; } = new ConcurrentDictionaryEx<Ulid, MessageBase>(200);
         private ConcurrentBag<BroadcastableItem> BroadcastQueue { get; set; } = new ConcurrentBag<BroadcastableItem>();
 
-        private readonly object _nodesLock = new object();
-        private readonly object _activeNodeLock = new object();
+        private ReaderWriterLockSlim _nodesRwLock = new ReaderWriterLockSlim();
+        private ReaderWriterLockSlim _activeNodeRwLock = new ReaderWriterLockSlim();
+
         private readonly object _stateMachineLock = new object();
         private readonly object _broadcastQueueLock = new object();
 
@@ -96,9 +97,13 @@ namespace SwimProtocol
 
         private void BroadcastPingReq()
         {
-            lock (_nodesLock)
+            _nodesRwLock.EnterReadLock();
+
+            try
             {
-                lock (_activeNodeLock)
+                _activeNodeRwLock.EnterReadLock();
+
+                try
                 {
                     //  Select k num of nodes.
                     RNGCryptoServiceProvider provider = new RNGCryptoServiceProvider();
@@ -111,7 +116,7 @@ namespace SwimProtocol
 
                     num = num < 0 ? num * -1 : num;
 
-                    int k = 1 + (num % Math.Min(_nodes.Count == 0 ? 1 :_nodes.Count, 8));
+                    int k = 1 + (num % Math.Min(_nodes.Count == 0 ? 1 : _nodes.Count, 8));
 
                     //  Create list of node candidates, remove active node.
                     var candidates = _nodes.ToList();
@@ -140,6 +145,14 @@ namespace SwimProtocol
                                 _swimProtocolProvider.Node));
                     }
                 }
+                finally
+                {
+                    _activeNodeRwLock.ExitReadLock();
+                }
+            }
+            finally
+            {
+                _nodesRwLock.ExitReadLock();
             }
         }
 
@@ -154,7 +167,9 @@ namespace SwimProtocol
         }
         private void HandleAliveNode()
         {
-            lock (_activeNodeLock)
+            _activeNodeRwLock.EnterWriteLock();
+
+            try
             {
                 if (ActiveNode == null) return;
 
@@ -167,11 +182,17 @@ namespace SwimProtocol
                 _nodeRepository.Upsert(ActiveNode);
                 AddNode(ActiveNode);
             }
+            finally
+            {
+                _activeNodeRwLock.ExitWriteLock();
+            }
         }
 
         private void HandleSuspectNode()
         {
-            lock (_activeNodeLock)
+            _activeNodeRwLock.EnterWriteLock();
+
+            try
             {
                 if (ActiveNode == null) return;
 
@@ -183,15 +204,23 @@ namespace SwimProtocol
 
                 _nodeRepository.Upsert(ActiveNode);
             }
+            finally
+            {
+                _activeNodeRwLock.ExitWriteLock();
+            }
         }
 
         public IEnumerable<ISwimNode> Members
         {
             get
             {
-                lock (_nodesLock)
+                _nodesRwLock.EnterReadLock();
+
+                try
                 {
-                    lock (_activeNodeLock)
+                    _activeNodeRwLock.EnterReadLock();
+
+                    try
                     {
                         var nodes = _nodes.ToList();
 
@@ -204,6 +233,14 @@ namespace SwimProtocol
 
                         return nodes;
                     }
+                    finally
+                    {
+                        _activeNodeRwLock.ExitReadLock();
+                    }
+                }
+                finally
+                {
+                    _nodesRwLock.ExitReadLock();
                 }
             }
         }
@@ -236,7 +273,7 @@ namespace SwimProtocol
                 .Where(x => x.Status == SwimNodeStatus.Suspicious && (DateTime.UtcNow - x.SuspiciousTimestamp) > new TimeSpan(0, 1, 0))
                 .ToList();
 
-            foreach(var expiredSuspect in expiredSuspects)
+            foreach (var expiredSuspect in expiredSuspects)
             {
                 _logger.LogInformation($"Marking {expiredSuspect.Endpoint} as DEAD and Broadcasting");
 
@@ -265,7 +302,9 @@ namespace SwimProtocol
 
         public void ShuffleNodes()
         {
-            lock (_nodesLock)
+            _nodesRwLock.EnterWriteLock();
+
+            try
             {
                 _logger.LogInformation("Shuffling nodes...");
 
@@ -280,6 +319,10 @@ namespace SwimProtocol
                     _nodes.Enqueue(node);
                 }
             }
+            finally
+            {
+                _nodesRwLock.ExitWriteLock();
+            }
         }
 
         private void PingElapsed()
@@ -288,7 +331,9 @@ namespace SwimProtocol
             {
                 lock (_stateMachineLock)
                 {
-                    lock (_activeNodeLock)
+                    _activeNodeRwLock.EnterReadLock();
+
+                    try
                     {
                         if (_stateMachine.State == SwimFailureDetectionState.Pinged)
                         {
@@ -313,6 +358,10 @@ namespace SwimProtocol
                             }
                         }
                     }
+                    finally
+                    {
+                        _activeNodeRwLock.ExitReadLock();
+                    }
                 }
             }
             catch (Exception ex)
@@ -327,43 +376,61 @@ namespace SwimProtocol
             {
                 lock (_stateMachineLock)
                 {
-                    lock (_activeNodeLock)
+
+                    if (_stateMachine.State == SwimFailureDetectionState.PingReqed)
                     {
-                        if (_stateMachine.State == SwimFailureDetectionState.PingReqed)
+                        bool isAlive = false;
+
+                        _activeNodeRwLock.EnterReadLock();
+
+                        try
                         {
                             if (ActiveNodeData == null)
                             {
-                                _stateMachine.Fire(SwimFailureDetectionTrigger.ProtocolExpireDead);
+                                isAlive = false;
                             }
 
                             if (ActiveNodeData != null)
                             {
                                 if (!ActiveNodeData.ReceivedAck)
                                 {
-                                    _stateMachine.Fire(SwimFailureDetectionTrigger.ProtocolExpireDead);
+                                    isAlive = false;
                                 }
                                 else
                                 {
-                                    _stateMachine.Fire(SwimFailureDetectionTrigger.ProtocolExpireLive);
+                                    isAlive = true;
                                 }
                             }
                         }
+                        finally
+                        {
+                            _activeNodeRwLock.ExitReadLock();
+                        }
 
-                        if (_stateMachine.State == SwimFailureDetectionState.Alive)
+                        if(isAlive)
                         {
                             _stateMachine.Fire(SwimFailureDetectionTrigger.ProtocolExpireLive);
                         }
-
-                        //  Unlikely state but it could happen.
-                        if (_stateMachine.State == SwimFailureDetectionState.Pinged)
+                        else
                         {
                             _stateMachine.Fire(SwimFailureDetectionTrigger.ProtocolExpireDead);
                         }
-
-                        ProtocolPeriodsComplete++;
-
-                        _stateMachine.Fire(SwimFailureDetectionTrigger.Reset);
                     }
+
+                    if (_stateMachine.State == SwimFailureDetectionState.Alive)
+                    {
+                        _stateMachine.Fire(SwimFailureDetectionTrigger.ProtocolExpireLive);
+                    }
+
+                    //  Unlikely state but it could happen.
+                    if (_stateMachine.State == SwimFailureDetectionState.Pinged)
+                    {
+                        _stateMachine.Fire(SwimFailureDetectionTrigger.ProtocolExpireDead);
+                    }
+
+                    ProtocolPeriodsComplete++;
+
+                    _stateMachine.Fire(SwimFailureDetectionTrigger.Reset);
                 }
             }
             catch (Exception ex)
@@ -432,12 +499,17 @@ namespace SwimProtocol
             lock (_broadcastQueueLock)
             {
                 //  Prioritize new items and remove items that have hit the Broadcast threshold or expired.
-                lock (_nodesLock)
+                _nodesRwLock.EnterReadLock();
+                try
                 {
                     BroadcastQueue = new ConcurrentBag<BroadcastableItem>(BroadcastQueue
                         .OrderByDescending(x => x.BroadcastCount)
                         .Where(x => x.BroadcastCount < Math.Max(Lambda * Math.Log(_nodes.Count + 1), 1) && x.SwimMessage.Message.IsValid)
                     );
+                }
+                finally
+                {
+                    _nodesRwLock.ExitReadLock();
                 }
 
                 var bis = BroadcastQueue.Count < num ? BroadcastQueue.Take(BroadcastQueue.Count) : BroadcastQueue.Take(num);
@@ -553,7 +625,9 @@ namespace SwimProtocol
 
         private void HandleAck(MessageBase message)
         {
-            lock (_activeNodeLock)
+            _activeNodeRwLock.EnterWriteLock();
+
+            try
             {
                 if (message.SourceNode.Equals(ActiveNode))
                 {
@@ -562,6 +636,10 @@ namespace SwimProtocol
                         ActiveNodeData.ReceivedAck = true;
                     }
                 }
+            }
+            finally
+            {
+                _activeNodeRwLock.ExitWriteLock();
             }
         }
 
@@ -595,12 +673,18 @@ namespace SwimProtocol
             if (node.Endpoint == _swimProtocolProvider.Node.Endpoint)
                 return;
 
-            lock (_nodesLock)
+            _nodesRwLock.EnterWriteLock();
+
+            try
             {
                 if (_nodes.All(x => x.Endpoint != node.Endpoint))
                 {
                     _nodes.Enqueue(node);
                 }
+            }
+            finally
+            {
+                _nodesRwLock.ExitWriteLock();
             }
         }
 
@@ -609,10 +693,16 @@ namespace SwimProtocol
             if (node == null)
                 return;
 
-            lock (_nodesLock)
+            _nodesRwLock.EnterWriteLock();
+
+            try
             {
                 var nodesFiltered = _nodes.Where(x => x.Endpoint != node.Endpoint);
                 _nodes = new ConcurrentQueue<ISwimNode>(nodesFiltered);
+            }
+            finally
+            {
+                _nodesRwLock.ExitWriteLock();
             }
 
             _nodeRepository.Delete(node);
@@ -620,7 +710,9 @@ namespace SwimProtocol
 
         public void MarkNodeSuspicious(ISwimNode node)
         {
-            lock (_nodesLock)
+            _nodesRwLock.EnterReadLock();
+
+            try
             {
                 if (node == null) return;
 
@@ -629,6 +721,10 @@ namespace SwimProtocol
                 suspiciousNode?.SetStatus(SwimNodeStatus.Suspicious);
 
                 _nodeRepository.Upsert(node);
+            }
+            finally
+            {
+                _nodesRwLock.ExitReadLock();
             }
         }
 
@@ -650,26 +746,38 @@ namespace SwimProtocol
 
             _logger.LogInformation(output.ToString());
 
-            lock (_nodesLock)
+            _nodesRwLock.EnterWriteLock();
+            ISwimNode node;
+            bool dequeued;
+
+            try
             {
                 InitialNodeCount = _nodes.Count;
+                dequeued = _nodes.TryDequeue(out node);
+            }
+            finally
+            {
+                _nodesRwLock.ExitWriteLock();
+            }
 
-                ISwimNode node;
+            if (dequeued)
+            {
+                _activeNodeRwLock.EnterWriteLock();
 
-                if (_nodes.TryDequeue(out node))
+                try
                 {
-                    lock (_activeNodeLock)
-                    {
-                        ActiveNode = node;
-
-                        PingNode(ActiveNode);
-                    }
+                    ActiveNode = node;
+                    PingNode(ActiveNode);
                 }
-
-                lock (_stateMachineLock)
+                finally
                 {
-                    _stateMachine.Fire(SwimFailureDetectionTrigger.Ping);
+                    _activeNodeRwLock.ExitWriteLock();
                 }
+            }
+
+            lock (_stateMachineLock)
+            {
+                _stateMachine.Fire(SwimFailureDetectionTrigger.Ping);
             }
         }
 
@@ -703,14 +811,11 @@ namespace SwimProtocol
 
             var ulid = Ulid.NewUlid();
 
-            lock (_activeNodeLock)
+            ActiveNodeData = new NodeData
             {
-                ActiveNodeData = new NodeData
-                {
-                    PingCorrelationId = ulid,
-                    ReceivedAck = false
-                };
-            }
+                PingCorrelationId = ulid,
+                ReceivedAck = false
+            };
 
             var ping = new PingMessage(ulid)
             {

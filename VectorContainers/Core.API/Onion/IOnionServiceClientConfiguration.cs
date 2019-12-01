@@ -17,5 +17,7 @@ namespace Core.API.Onion
         string IsTorStartedRoute { get; }
 
         string SignMessageRoute { get; }
+
+        TimeSpan ClientTimeout { get; }
     }
 }

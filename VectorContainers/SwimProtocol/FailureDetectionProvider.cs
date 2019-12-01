@@ -492,7 +492,8 @@ namespace SwimProtocol
                 items.Add(item);
 
                 BroadcastQueue = new ConcurrentBag<BroadcastableItem>(items
-                    .OrderByDescending(x => x.BroadcastCount));
+                    .OrderByDescending(x => x.BroadcastCount)
+                    .Take(200));
             }
 
             return true;

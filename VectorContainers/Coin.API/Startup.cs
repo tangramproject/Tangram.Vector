@@ -3,14 +3,17 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Coin.API.Services;
 using System.Diagnostics;
-using Coin.API.Middlewares;
 using Core.API.Consensus;
 using Akka.Actor;
 using Microsoft.Extensions.Hosting;
-using Coin.API.ActorProviders;
 using Coin.API.StartupExtensions;
+using Core.API.Network;
+using Coin.API.Actors;
+using Core.API.Middlewares;
+using Core.API.Actors.Providers;
+using Core.API.Extensions;
+using Coin.API.Model;
 
 namespace Coin.API
 {
@@ -38,6 +41,8 @@ namespace Coin.API
         /// <param name="services"></param>
         public void ConfigureServices(IServiceCollection services)
         {
+            var gatewaySection = Configuration.GetSection("Gateway");
+
             services.AddResponseCompression();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
             services.AddMvc(option => option.EnableEndpointRouting = false);
@@ -46,27 +51,26 @@ namespace Coin.API
             services.AddHttpContextAccessor();
             services.AddOptions();
             services.Configure<BlockmainiaOptions>(Configuration);
-            services.AddSyncProvider();
-            services.AddBroadcastProvider();
+            services.AddSyncProvider<CoinProto>("coins");
+            services.AddBroadcastProvider<CoinProto>();
             //services.AddMissingBlocksProvider();
             services.AddDbContext();
             services.AddUnitOfWork();
             services.AddOnionServiceClientConfiguration();
             services.AddOnionServiceClient();
-            services.AddHttpService();
-            services.AddHttpClientHandler();
+            services.AddHttpClientService(gatewaySection.GetValue<string>("Url"));
+            services.AddHttpClientHandler<Startup>();
             services.AddBroadcastClient();
-            services.AddTorClient();
+            services.AddTorClient<Startup>();
             services.AddMembershipServiceClient();
-            services.AddActorSystem();
-            services.AddNetworkActorProvider();
+            services.AddActorSystem("coinapi");
+            services.AddNetworkActorProvider<CoinProto>();
             services.AddSigningActorProvider();
-            services.AddInterpretActorProvider();
-            services.AddProcessBlockActorProvider();
-            services.AddSipActorProvider();
+            services.AddInterpretActorProvider<CoinProto>(InterpretBlockActor.Create);
+            services.AddProcessActorProvider<CoinProto>();
+            services.AddSipActorProvider<Startup, CoinProto>();
             services.AddBlockGraphService();
             services.AddCoinService();
-
         }
 
         /// <summary>
@@ -82,7 +86,7 @@ namespace Coin.API
                 app.UsePathBase(pathBase);
             }
 
-            app.UseSync();
+            app.UseSync<CoinProto>();
             app.UseStaticFiles();
             app.UseRouting();
             app.UseCors("default");
@@ -106,7 +110,7 @@ namespace Coin.API
 
             lifetime.ApplicationStopping.Register(() =>
             {
-                app.ApplicationServices.GetService<IHttpService>().Dispose();
+                app.ApplicationServices.GetService<IHttpClientService>().Dispose();
                 app.ApplicationServices.GetService<ActorSystem>().Terminate().Wait();
             });
         }

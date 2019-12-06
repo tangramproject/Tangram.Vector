@@ -3,11 +3,11 @@ using Core.API.Model;
 
 namespace Core.API.Messages
 {
-    public class VerifiyBlockSignatureMessage
+    public class VerifiyBlockSignatureMessage<TAttach>
     {
-        public BlockIDProto BlockID { get; }
+        public BaseBlockIDProto<TAttach> BlockID { get; }
 
-        public VerifiyBlockSignatureMessage(BlockIDProto blockID)
+        public VerifiyBlockSignatureMessage(BaseBlockIDProto<TAttach> blockID)
         {
             BlockID = blockID;
         }

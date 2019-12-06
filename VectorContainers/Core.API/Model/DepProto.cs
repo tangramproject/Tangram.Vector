@@ -4,15 +4,15 @@ using ProtoBuf;
 namespace Core.API.Model
 {
     [ProtoContract]
-    public class DepProto
+    public class DepProto<TAttach>
     {
         public string Id { get; set; }
 
         [ProtoMember(1)]
-        public BlockIDProto Block = new BlockIDProto();
+        public BaseBlockIDProto<TAttach> Block = new BaseBlockIDProto<TAttach>();
         [ProtoMember(2)]
-        public List<BlockIDProto> Deps = new List<BlockIDProto>();
+        public List<BaseBlockIDProto<TAttach>> Deps = new List<BaseBlockIDProto<TAttach>>();
         [ProtoMember(3)]
-        public BlockIDProto Prev = new BlockIDProto();
+        public BaseBlockIDProto<TAttach> Prev = new BaseBlockIDProto<TAttach>();
     }
 }

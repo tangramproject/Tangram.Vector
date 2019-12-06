@@ -12,7 +12,7 @@ namespace Core.API.Consensus
         public string Hash { get; }
         public ulong Node { get; }
         public ulong Round { get; }
-        public BlockProto SignedBlock { get; }
+        public object SignedBlock { get; }
 
         public BlockID()
         {
@@ -35,7 +35,7 @@ namespace Core.API.Consensus
             Round = round;
         }
 
-        public BlockID(string hash, ulong node, ulong round, BlockProto singedBlock)
+        public BlockID(string hash, ulong node, ulong round, object singedBlock)
         {
             Hash = hash;
             Node = node;

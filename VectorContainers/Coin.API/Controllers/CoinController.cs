@@ -6,6 +6,7 @@ using Core.API.Model;
 using Microsoft.Extensions.Logging;
 using System;
 using Microsoft.AspNetCore.Http;
+using Coin.API.Model;
 
 namespace Coin.API.Controllers
 {

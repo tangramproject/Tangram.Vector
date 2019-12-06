@@ -5,6 +5,8 @@ using Core.API.Model;
 using Core.API.Helper;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
+using Core.API.Network;
+using Coin.API.Model;
 
 namespace Coin.API.Services
 {
@@ -12,15 +14,20 @@ namespace Coin.API.Services
     {
         private readonly IUnitOfWork unitOfWork;
         private readonly IBlockGraphService blockGraphService;
-        private readonly IHttpService httpService;
+        private readonly IHttpClientService httpClientService;
         private readonly ILogger logger;
+        private readonly IBaseGraphRepository<CoinProto> baseGraphRepository;
+        private readonly IBaseBlockIDRepository<CoinProto> baseBlockIDRepository;
 
-        public CoinService(IUnitOfWork unitOfWork, IBlockGraphService blockGraphService, IHttpService httpService, ILogger<CoinService> logger)
+        public CoinService(IUnitOfWork unitOfWork, IBlockGraphService blockGraphService, IHttpClientService httpClientService, ILogger<CoinService> logger)
         {
             this.unitOfWork = unitOfWork;
             this.blockGraphService = blockGraphService;
-            this.httpService = httpService;
+            this.httpClientService = httpClientService;
             this.logger = logger;
+
+            baseGraphRepository = unitOfWork.CreateBaseGraphOf<CoinProto>();
+            baseBlockIDRepository = unitOfWork.CreateBaseBlockIDOf<CoinProto>();
         }
 
         /// <summary>
@@ -38,31 +45,33 @@ namespace Coin.API.Services
                 var coinHasElements = coin.Validate().Any();
                 if (!coinHasElements)
                 {
-                    var blockIDExist = await unitOfWork.BlockID.HasCoin(coin.Stamp, coin.Version);
-                    if (blockIDExist)
+                    var blockIDExist = await baseBlockIDRepository
+                        .GetFirstOrDefault(x => x.SignedBlock.Attach.Stamp.Equals(coin.Stamp) && x.SignedBlock.Attach.Version.Equals(coin.Version));
+
+                    if (blockIDExist != null)
                     {
                         return null;
                     }
 
-                    var blockGraphExist = await unitOfWork.BlockGraph.GetFirstOrDefault(x =>
+                    var blockGraphExist = await baseGraphRepository.GetFirstOrDefault(x =>
                         x.Block.Hash.Equals(coin.Stamp) &&
-                        x.Block.SignedBlock.Coin.Version.Equals(coin.Version) &&
-                        x.Block.Node.Equals(httpService.NodeIdentity));
+                        x.Block.SignedBlock.Attach.Version.Equals(coin.Version) &&
+                        x.Block.Node.Equals(httpClientService.NodeIdentity));
 
                     if (blockGraphExist != null)
                     {
                         return null;
                     }
 
-                    var blockGraph = new BlockGraphProto
+                    var blockGraph = new BaseGraphProto<CoinProto>
                     {
-                        Block = new BlockIDProto
+                        Block = new BaseBlockIDProto<CoinProto>
                         {
-                            Node = httpService.NodeIdentity,
+                            Node = httpClientService.NodeIdentity,
                             Hash = coin.Stamp,
-                            SignedBlock = new BlockProto { Coin = coin, Key = coin.Stamp }
+                            SignedBlock = new BaseBlockProto<CoinProto> { Attach = coin, Key = coin.Stamp }
                         },
-                        Deps = new List<DepProto>()
+                        Deps = new List<DepProto<CoinProto>>()
                     };
 
                     var graphProto = await blockGraphService.SetBlockGraph(blockGraph);
@@ -97,7 +106,7 @@ namespace Coin.API.Services
 
             try
             {
-                var blockId = await unitOfWork.BlockID.GetFirstOrDefault(x => x.SignedBlock.Coin.Hash.Equals(key));
+                var blockId = await baseBlockIDRepository.GetFirstOrDefault(x => x.SignedBlock.Attach.Hash.Equals(key));
                 if (blockId != null)
                 {
                     result = Util.SerializeProto(blockId);
@@ -160,7 +169,7 @@ namespace Coin.API.Services
 
             try
             {
-                var blockIds = await unitOfWork.BlockID.GetRange(skip, take);
+                var blockIds = await baseBlockIDRepository.GetRange(skip, take);
                 if (blockIds?.Any() == true)
                 {
                     result = Util.SerializeProto(blockIds);
@@ -188,7 +197,7 @@ namespace Coin.API.Services
 
             try
             {
-                var blockIds = await unitOfWork.BlockID.GetWhere(x => x.SignedBlock.Coin.Hash.Equals(key));
+                var blockIds = await baseBlockIDRepository.GetWhere(x => x.SignedBlock.Attach.Hash.Equals(key));
                 if (blockIds?.Any() == true)
                 {
                     result = Util.SerializeProto(blockIds);

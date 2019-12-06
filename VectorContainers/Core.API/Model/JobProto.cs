@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace Core.API.Model
 {
     [ProtoContract]
-    public class JobProto
+    public class JobProto<TAttach>
     {
         public string Id { get; set; }
 
@@ -23,7 +23,7 @@ namespace Core.API.Model
         [ProtoMember(7)]
         public JobState Status { get; set; }
         [ProtoMember(8)]
-        public BlockGraphProto BlockGraph { get; set; }
+        public BaseGraphProto<TAttach> Model { get; set; }
         [ProtoMember(9)]
         public long Epoch { get; set; }
     }

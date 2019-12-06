@@ -1,10 +1,11 @@
 ﻿using System.Threading.Tasks;
+using Coin.API.Model;
 using Core.API.Model;
 
 namespace Coin.API.Services
 {
     public interface IBlockGraphService
     {
-        Task<BlockGraphProto> SetBlockGraph(BlockGraphProto blockGraph);
+        Task<BaseGraphProto<CoinProto>> SetBlockGraph(BaseGraphProto<CoinProto> blockGraph);
     }
 }

@@ -1,59 +1,12 @@
-﻿using System;
-using Coin.API.Providers;
-using Coin.API.Services;
-using Core.API.Model;
+﻿using Coin.API.Services;
+using Core.API.Providers;
+using Core.API.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Coin.API.StartupExtensions
 {
     public static class AppExtenstions
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="services"></param>
-        /// <returns></returns>
-        public static IServiceCollection AddSyncProvider(this IServiceCollection services)
-        {
-            services.AddSingleton<SyncProvider>();
-            services.AddHostedService<SyncService>();
-            return services;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="services"></param>
-        /// <returns></returns>
-        public static IServiceCollection AddBroadcastProvider(this IServiceCollection services)
-        {
-            services.AddSingleton<BroadcastProvider>();
-            services.AddHostedService<BroadcastService>();
-            return services;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="services"></param>
-        /// <returns></returns>
-        public static IServiceCollection AddDbContext(this IServiceCollection services)
-        {
-            services.AddSingleton<IDbContext, DbContext>();
-            return services;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="services"></param>
-        /// <returns></returns>
-        public static IServiceCollection AddUnitOfWork(this IServiceCollection services)
-        {
-            services.AddSingleton<IUnitOfWork, UnitOfWork>();
-            return services;
-        }
-
         /// <summary>
         /// 
         /// </summary>
@@ -81,10 +34,10 @@ namespace Coin.API.StartupExtensions
         /// </summary>
         /// <param name="services"></param>
         /// <returns></returns>
-        public static IServiceCollection AddMissingBlocksProvider(this IServiceCollection services)
+        public static IServiceCollection AddMissingBlocksProvider<TAttach>(this IServiceCollection services)
         {
-            services.AddSingleton<MissingBlocksProvider>();
-            services.AddHostedService<MissingBlocksService>();
+            services.AddSingleton<MissingBlocksProvider<TAttach>>();
+            services.AddHostedService<MissingBlocksService<TAttach>>();
             return services;
         }
     }

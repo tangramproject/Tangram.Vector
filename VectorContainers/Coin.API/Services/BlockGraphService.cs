@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Coin.API.ActorProviders;
+using Coin.API.Model;
+using Core.API.Actors.Providers;
+using Core.API.Extentions;
 using Core.API.Helper;
 using Core.API.Messages;
 using Core.API.Model;
@@ -16,12 +18,15 @@ namespace Coin.API.Services
         private readonly ISipActorProvider sipActorProvider;
         private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
+        private readonly IBaseGraphRepository<CoinProto> baseGraphRepository;
 
         public BlockGraphService(ISipActorProvider sipActorProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphService> logger)
         {
             this.sipActorProvider = sipActorProvider;
             this.unitOfWork = unitOfWork;
             this.logger = logger;
+
+            baseGraphRepository = unitOfWork.CreateBaseGraphOf<CoinProto>();
         }
 
         /// <summary>
@@ -29,7 +34,7 @@ namespace Coin.API.Services
         /// </summary>
         /// <param name="blockGraph"></param>
         /// <returns></returns>
-        public async Task<BlockGraphProto> SetBlockGraph(BlockGraphProto blockGraph)
+        public async Task<BaseGraphProto<CoinProto>> SetBlockGraph(BaseGraphProto<CoinProto> blockGraph)
         {
             if (blockGraph == null)
                 throw new ArgumentNullException(nameof(blockGraph));
@@ -38,13 +43,14 @@ namespace Coin.API.Services
             {
                 try
                 {
-                    var can = await unitOfWork.BlockGraph.CanAdd(blockGraph, blockGraph.Block.Node);
+                    var can = await baseGraphRepository.CanAdd(blockGraph, blockGraph.Block.Node);
                     if (can == null)
                     {
                         return blockGraph;
                     }
 
-                    var stored = await unitOfWork.BlockGraph.StoreOrUpdate(new BlockGraphProto
+
+                    var stored = await baseGraphRepository.StoreOrUpdate(new BaseGraphProto<CoinProto>
                     {
                         Block = blockGraph.Block,
                         Deps = blockGraph.Deps?.Select(d => d).ToList(),
@@ -61,7 +67,7 @@ namespace Coin.API.Services
 
                     sipActorProvider.Register(new HashedMessage(stored.Block.Hash.FromHex()));
 
-                    return stored;
+                    return null;
                 }
                 catch (Exception ex)
                 {

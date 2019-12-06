@@ -2,12 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Core.API.Consensus;
 using Microsoft.Extensions.Logging;
 
 namespace Core.API.Model
 {
-    public class JobRepository : Repository<JobProto>, IJobRepository
+    public class JobRepository<TAttach> : Repository<JobProto<TAttach>>, IJobRepository<TAttach>
     {
         private readonly IDbContext dbContext;
         private readonly ILogger logger;
@@ -24,7 +23,7 @@ namespace Core.API.Model
         /// </summary>
         /// <param name="job"></param>
         /// <returns></returns>
-        public Task Include(JobProto job)
+        public Task Include(JobProto<TAttach> job)
         {
             if (job == null)
                 throw new ArgumentNullException(nameof(job));
@@ -33,9 +32,9 @@ namespace Core.API.Model
             {
                 var session = dbContext.Document.OpenSession();
 
-                foreach (var nNext in job.BlockGraph.Deps)
+                foreach (var nNext in job.Model.Deps)
                 {
-                    var blockGraph = session.Load<BlockGraphProto>(nNext.Id);
+                    var blockGraph = session.Load<BaseGraphProto<TAttach>>(nNext.Id);
                     blockGraph.Included = true;
 
                     session.Store(blockGraph, blockGraph.Id);
@@ -56,7 +55,7 @@ namespace Core.API.Model
         /// </summary>
         /// <param name="job"></param>
         /// <returns></returns>
-        public Task<bool> SetState(JobProto job, JobState state)
+        public Task<bool> SetState(JobProto<TAttach> job, JobState state)
         {
             if (job == null)
                 throw new ArgumentNullException(nameof(job));

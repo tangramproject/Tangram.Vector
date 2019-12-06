@@ -20,6 +20,7 @@ using DotNetTor.SocksPort;
 using Core.API.Models;
 using Core.API.Signatures;
 using Microsoft.Extensions.Hosting;
+using Core.API.Extentions;
 
 namespace Core.API.Onion
 {

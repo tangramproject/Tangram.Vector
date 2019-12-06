@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Coin.API.ActorProviders;
+using Coin.API.Model;
 using Coin.API.Services;
+using Core.API.Actors.Providers;
 using Core.API.Helper;
 using Core.API.Model;
+using Core.API.Network;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -16,16 +18,16 @@ namespace Coin.API.Controllers
     public class BlockGraphController : Controller
     {
         private readonly IBlockGraphService blockGraphService;
-        private readonly IHttpService httpService;
+        private readonly IHttpClientService httpClientService;
         private readonly INetworkActorProvider networkProvider;
         private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
 
-        public BlockGraphController(IBlockGraphService blockGraphService, IHttpService httpService,
+        public BlockGraphController(IBlockGraphService blockGraphService, IHttpClientService httpClientService,
             INetworkActorProvider networkProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphController> logger)
         {
             this.blockGraphService = blockGraphService;
-            this.httpService = httpService;
+            this.httpClientService = httpClientService;
             this.networkProvider = networkProvider;
             this.unitOfWork = unitOfWork;
             this.logger = logger;
@@ -43,7 +45,7 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockGrpahProto = Util.DeserializeProto<BlockGraphProto>(blockGraph);
+                var blockGrpahProto = Util.DeserializeProto<BaseGraphProto<CoinProto>>(blockGraph);
                 var block = await blockGraphService.SetBlockGraph(blockGrpahProto);
 
                 return new ObjectResult(new { protobuf = Util.SerializeProto(block) });
@@ -68,7 +70,7 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockGraphProtos = Util.DeserializeListProto<BlockGraphProto>(blockGraphs);
+                var blockGraphProtos = Util.DeserializeListProto<BaseGraphProto<CoinProto>>(blockGraphs);
                 if (blockGraphProtos?.Any() == true)
                 {
                     var blockInfos = new List<BlockInfoProto>();
@@ -151,10 +153,10 @@ namespace Coin.API.Controllers
         {
             try
             {
-                var blockGraph = await unitOfWork.BlockGraph
-                    .GetWhere(x => x.Block.Hash.Equals(hash) && x.Block.Node.Equals(httpService.NodeIdentity) && x.Block.Round.Equals(round));
+                //var blockGraph = await unitOfWork.BlockGraph
+                //    .GetWhere(x => x.Block.Hash.Equals(hash) && x.Block.Node.Equals(httpClientService.NodeIdentity) && x.Block.Round.Equals(round));
 
-                return new ObjectResult(new { protobuf = Util.SerializeProto(blockGraph) });
+                return new ObjectResult(new { protobuf = Util.SerializeProto(new byte()) });
             }
             catch (Exception ex)
             {
@@ -177,36 +179,14 @@ namespace Coin.API.Controllers
             {
                 var pubKey = Request.Headers["x-pub"];
                 var peer = Util.HashToId(pubKey.First());
-                var identity = httpService.GetIdentity(peer);
-                var signedPayload = await httpService.SignPayload(identity);
+                var identity = httpClientService.GetIdentity(peer);
+                var signedPayload = await httpClientService.SignPayload(identity);
 
                 return new ObjectResult(new { identity = Util.SerializeProto(signedPayload) });
             }
             catch (Exception ex)
             {
                 logger.LogError($"<<< Identity - Controller >>>: {ex.ToString()}");
-            }
-
-            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        [HttpGet("interpreted", Name = "Interpreted")]
-        [ProducesResponseType(typeof(byte[]), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Interpreted()
-        {
-            try
-            {
-                var interpreted = await unitOfWork.Interpreted.Get();
-                return new ObjectResult(new { interpreted = Util.SerializeProto(interpreted) });
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"<<< Interpreted - Controller >>>: {ex.ToString()}");
             }
 
             return new StatusCodeResult(StatusCodes.Status500InternalServerError);

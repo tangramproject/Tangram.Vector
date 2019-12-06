@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Core.API.Model
 {
-    public class Repository<TEntity> : IRepository<TEntity> where TEntity : class
+    public class Repository<TEntity> : IRepository<TEntity>
     {
         private readonly IDbContext dbContext;
         private readonly ILogger logger;
@@ -140,6 +140,28 @@ namespace Core.API.Model
             {
                 using var session = dbContext.Document.OpenSession();
                 entity = session.Query<TEntity>().FirstOrDefault(expression);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Repository.GetFirstOrDefault >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(entity);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns></returns>
+        public Task<TEntity> GetLast(Expression<Func<TEntity, bool>> expression)
+        {
+            TEntity entity = default;
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+                entity = session.Query<TEntity>().LastOrDefault(expression);
             }
             catch (Exception ex)
             {

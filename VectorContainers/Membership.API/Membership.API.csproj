@@ -33,6 +33,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Remove="publish\appsettings.Development.json" />
+    <Content Remove="publish\Properties\launchSettings.json" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Update="launchSettings.json">
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>

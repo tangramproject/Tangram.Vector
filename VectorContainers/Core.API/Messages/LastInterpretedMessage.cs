@@ -1,14 +1,13 @@
-﻿using System;
-using Core.API.Model;
+﻿using Core.API.Model;
 
 namespace Core.API.Messages
 {
-    public class LastInterpretedMessage
+    public class LastInterpretedMessage<TAttach>
     {
         public ulong Last { get; }
-        public BlockIDProto BlockID { get; }
+        public BaseBlockIDProto<TAttach> BlockID { get; }
 
-        public LastInterpretedMessage(ulong last, BlockIDProto blockID)
+        public LastInterpretedMessage(ulong last, BaseBlockIDProto<TAttach> blockID)
         {
             Last = last;
             BlockID = blockID;

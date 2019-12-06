@@ -1,6 +1,5 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Core.API.Model;
+﻿using System.Threading.Tasks;
+using Coin.API.Model;
 
 namespace Coin.API.Services
 {

@@ -22,20 +22,17 @@
   <ItemGroup>
     <Folder Include="wwwroot\" />
     <Folder Include="BuildingBlocks\" />
-    <Folder Include="VData\" />
-    <Folder Include="Providers\" />
-    <Folder Include="Middlewares\" />
     <Folder Include="Actors\" />
-    <Folder Include="ActorProviders\" />
     <Folder Include="StartupExtensions\" />
+    <Folder Include="Model\" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="5.0.0-rc4" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.0.1" />
     <PackageReference Include="Serilog.Extensions.Logging.File" Version="1.1.0" />
-    <PackageReference Include="Serilog.AspNetCore" Version="3.1.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="3.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.0.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="4.1.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
   </ItemGroup>

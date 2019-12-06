@@ -1,18 +1,14 @@
-﻿using System;
-using Raven.Client.Documents;
+﻿using Raven.Client.Documents;
 
 namespace Core.API.Model
 {
     public interface IUnitOfWork
     {
         IDocumentStore Document { get; }
-
-        IBlockGraphRepository BlockGraph { get; }
-        IBlockIDRepository BlockID { get; }
         IMessageRepository Message { get; }
-        IJobRepository Job { get; }
-        IInterpretedRepository Interpreted { get; }
-        IStampRepository Stamp { get; }
-        ICacheRepository Cache { get; }
+
+        IBaseBlockIDRepository<TAttach> CreateBaseBlockIDOf<TAttach>();
+        IBaseGraphRepository<TAttach> CreateBaseGraphOf<TAttach>();
+        IJobRepository<TAttach> CreateJobOf<TAttach>();
     }
 }

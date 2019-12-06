@@ -1,32 +1,53 @@
-﻿
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Raven.Client.Documents;
 
 namespace Core.API.Model
 {
     public class UnitOfWork : IUnitOfWork
     {
-        public IBlockGraphRepository BlockGraph { get; private set; }
-        public IBlockIDRepository BlockID { get; private set; }
-        public IMessageRepository Message { get; private set; }
-        public IJobRepository Job { get; private set; }
-        public IInterpretedRepository Interpreted { get; private set; }
-        public IStampRepository Stamp { get; private set; }
-        public ICacheRepository Cache { get; private set; }
+        private readonly IDbContext dbContext;
+        private readonly ILogger logger;
 
+        public IMessageRepository Message { get; private set; }
         public IDocumentStore Document { get; }
 
         public UnitOfWork(IDbContext dbContext, ILogger<UnitOfWork> logger)
         {
-            Document = dbContext.Document;
+            this.dbContext = dbContext;
+            this.logger = logger;
 
-            BlockGraph = new BlockGraphRepository(dbContext, logger);
-            BlockID = new BlockIDRepository(dbContext, logger);
+            Document = dbContext.Document;
             Message = new MessageRepository(dbContext, logger);
-            Job = new JobRepository(dbContext, logger);
-            Interpreted = new InterpretedRepository(dbContext, logger);
-            Stamp = new StampRepository(dbContext, logger);
-            Cache = new CacheRepository(dbContext, logger);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <returns></returns>
+        public IBaseGraphRepository<TAttach> CreateBaseGraphOf<TAttach>()
+        {
+            return new BaseGraphRepository<TAttach>(dbContext, logger);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <returns></returns>
+        public IJobRepository<TAttach> CreateJobOf<TAttach>()
+        {
+            return new JobRepository<TAttach>(dbContext, logger);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <returns></returns>
+        public IBaseBlockIDRepository<TAttach> CreateBaseBlockIDOf<TAttach>()
+        {
+            return new BaseBlockIDRepository<TAttach>(dbContext, logger);
         }
     }
 }

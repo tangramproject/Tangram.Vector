@@ -2,11 +2,11 @@
 
 namespace Core.API.Messages
 {
-    public class ProcessBlockMessage
+    public class ProcessBlockMessage<TAttach>
     {
-        public BlockGraphProto BlockGraph { get; }
+        public BaseGraphProto<TAttach> BlockGraph { get; }
 
-        public ProcessBlockMessage(BlockGraphProto blockGraph)
+        public ProcessBlockMessage(BaseGraphProto<TAttach> blockGraph)
         {
             BlockGraph = blockGraph;
         }

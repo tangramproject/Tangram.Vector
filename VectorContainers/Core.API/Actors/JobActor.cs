@@ -21,6 +21,8 @@ namespace Core.API.Actors
         private readonly IBaseGraphRepository<TAttach> baseGraphRepository;
         private readonly IJobRepository<TAttach> jobRepository;
 
+        private readonly Dictionary<IActorRef, HashSet<long>> ackBuffer;
+
         public byte[] Id { get; private set; }
 
         public JobActor(IUnitOfWork unitOfWork, IHttpClientService httpClientService)
@@ -30,12 +32,29 @@ namespace Core.API.Actors
 
             logger = Context.GetLogger();
 
+            ackBuffer = new Dictionary<IActorRef, HashSet<long>>();
+
             baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             jobRepository = unitOfWork.CreateJobOf<TAttach>();
+
+            Receive<ReliableDeliveryEnvelopeMessage<WriteMessage>>(
+                write => ackBuffer.ContainsKey(Sender) && ackBuffer[Sender].Contains(write.MessageId),
+                write =>
+            {
+                Sender.Tell(new ReliableDeliveryAckMessage(write.MessageId));
+            });
+
 
             ReceiveAsync<ReliableDeliveryEnvelopeMessage<WriteMessage>>(async write =>
             {
                 Sender.Tell(new ReliableDeliveryAckMessage(write.MessageId));
+
+                if (!ackBuffer.ContainsKey(Sender))
+                {
+                    ackBuffer.Add(Sender, new HashSet<long>());
+                }
+
+                ackBuffer[Sender].Add(write.MessageId);
 
                 await Register(new HashedMessage(write.Message.Content.FromHex()));
                 await Sender.GracefulStop(TimeSpan.FromSeconds(5));

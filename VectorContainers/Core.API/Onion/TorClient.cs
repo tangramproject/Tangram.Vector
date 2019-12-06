@@ -15,6 +15,8 @@ namespace Core.API.Onion
         {
             _client = httpClient;
             _configuration = configuration;
+
+            _client.Timeout = configuration.ClientTimeout;
         }
 
         public async Task<HttpResponseMessage> PostAsync(string requestUri, HttpContent content)

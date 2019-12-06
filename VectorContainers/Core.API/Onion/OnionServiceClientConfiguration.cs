@@ -26,6 +26,8 @@ namespace Core.API.Onion
 
         public string IsTorStartedRoute { get; }
 
+        public TimeSpan ClientTimeout { get; }
+
         public OnionServiceClientConfiguration(IConfiguration configuration)
         {
             var onionSection = configuration.GetSection(OnionConstants.ConfigSection);
@@ -36,6 +38,8 @@ namespace Core.API.Onion
             ControlPort = onionSection.GetValue<int>(OnionConstants.ControlPort);
             HiddenServicePort = onionSection.GetValue<string>(OnionConstants.HiddenServicePort);
             OnionServiceAddress = onionSection.GetValue<string>(OnionConstants.OnionServiceAddress);
+            ClientTimeout = TimeSpan.FromSeconds(onionSection.GetValue(OnionConstants.ClientTimeout, 7));
+
             GetHiddenServiceDetailsRoute = "api/Onion/hsdetails";
             SignMessageRoute = "api/Onion/sign";
             IsTorStartedRoute = "api/Onion/istorstarted";

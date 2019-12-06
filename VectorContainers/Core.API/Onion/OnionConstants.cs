@@ -23,5 +23,6 @@ namespace Core.API.Onion
         public const string PublicKeyFileName = "hs_ed25519_public_key";
         public const string SecretKeyFileName = "hs_ed25519_secret_key";
         public const string OnionServiceAddress = "onion_service_address";
+        public const string ClientTimeout = "client_timeout";
     }
 }

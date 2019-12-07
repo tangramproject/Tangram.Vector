@@ -26,6 +26,7 @@ jobs:
       run:  |
         cd VectorContainers
         dotnet restore VectorContainers.sln
+        dotnet publish Broker.API --output publish/Broker.API --configuration Release
         dotnet publish Coin.API --output publish/Coin.API --configuration Release
         dotnet publish MessagePool.API --output publish/MessagePool.API --configuration Release
         dotnet publish Onion.API --output publish/Onion.API --configuration Release

@@ -45,18 +45,9 @@ namespace Core.API.MQTT
                     .Build())
                 .Build();
 
-            client.UseApplicationMessageReceivedHandler(OnMessageReceived);
+            client.UseApplicationMessageReceivedHandler(OnMqttApplicationMessageReceived);
             client.SubscribeAsync(topic);
             client.StartAsync(options);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="arg"></param>
-        private void OnMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
-        {
-            OnMqttApplicationMessageReceived(arg);
         }
 
         /// <summary>

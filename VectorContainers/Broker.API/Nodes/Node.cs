@@ -1,8 +1,9 @@
 ﻿using System;
-using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Client.Options;
 using MQTTnet.Extensions.ManagedClient;
+using Serilog;
+using Serilog.Events;
 
 namespace Broker.API.Nodes
 {
@@ -11,8 +12,7 @@ namespace Broker.API.Nodes
         private readonly ulong id;
         private readonly string host;
         private readonly int port;
-        private readonly ILogger logger;
-        
+
         private IManagedMqttClient client;
 
         public Node(ulong id, string host, int port)
@@ -21,8 +21,12 @@ namespace Broker.API.Nodes
             this.host = host;
             this.port = port;
 
-            var loggerFactory = new LoggerFactory();
-            logger = loggerFactory.CreateLogger<Node>();
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .WriteTo.File("MQTT.Node.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 2)
+                .CreateLogger();
         }
 
         /// <summary>
@@ -39,11 +43,11 @@ namespace Broker.API.Nodes
         /// </summary>
         public void Start()
         {
-            logger.LogInformation($"Starting replication client {this}...");
+            Log.Information($"Starting replication client {this}...");
 
             client = new MqttFactory().CreateManagedMqttClient();
-            client.UseConnectedHandler(args => logger.LogInformation($"Replication client connected {this}"));
-            client.UseDisconnectedHandler(args => logger.LogInformation($"Replication client disconnected {this}"));
+            client.UseConnectedHandler(args => Log.Information($"Replication client connected {this}"));
+            client.UseDisconnectedHandler(args => Log.Information($"Replication client disconnected {this}"));
             var options = new ManagedMqttClientOptionsBuilder()
                 .WithAutoReconnectDelay(TimeSpan.FromSeconds(5))
                 .WithClientOptions(new MqttClientOptionsBuilder()
@@ -95,7 +99,7 @@ namespace Broker.API.Nodes
 
             var result = client.PublishAsync(replicated.Build()).Result;
 
-            logger.LogInformation($"Replicating message to {this}... {result.ReasonCode}");
+            Log.Information($"Replicating message to {this}... {result.ReasonCode}");
         }
     }
 }

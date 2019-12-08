@@ -1,8 +1,10 @@
 ﻿using System;
-using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client.Options;
 using MQTTnet.Extensions.ManagedClient;
+using Serilog;
+using Serilog.Events;
 
 namespace Core.API.MQTT
 {
@@ -14,7 +16,6 @@ namespace Core.API.MQTT
         private readonly string host;
         private readonly int port;
         private readonly string topic;
-        private readonly ILogger logger;
         private readonly IManagedMqttClient client;
 
         public Subscriber(ulong id, string host, int port, string topic)
@@ -24,44 +25,59 @@ namespace Core.API.MQTT
             this.port = port;
             this.topic = topic;
 
-            var loggerFactory = new LoggerFactory();
-            logger = loggerFactory.CreateLogger<Subscriber>();
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .WriteTo.File("MQTT.Subscriber.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 2)
+                .CreateLogger();
 
             client = new MqttFactory().CreateManagedMqttClient();
 
-            Start();
+            client.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(e =>
+            {
+                Log.Error($"<<< Subscriber >>>: Connecting failed! {e.Exception.ToString()}");
+            });
         }
 
         /// <summary>
         /// 
         /// </summary>
-        internal void Start()
+        public bool IsConnected => client.IsConnected;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public async Task<bool> Start()
         {
             var options = new ManagedMqttClientOptionsBuilder()
                 .WithAutoReconnectDelay(TimeSpan.FromSeconds(5))
                 .WithClientOptions(new MqttClientOptionsBuilder()
                     .WithClientId($"Subscriber-{id}")
                     .WithTcpServer(host, port)
+                    .WithCommunicationTimeout(TimeSpan.FromSeconds(5))
                     .Build())
                 .Build();
 
             client.UseApplicationMessageReceivedHandler(OnMqttApplicationMessageReceived);
-            client.SubscribeAsync(topic);
-            client.StartAsync(options);
+            await client.SubscribeAsync(topic);
+            await client.StartAsync(options);
+
+            return client.IsStarted;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="e"></param>
-        protected virtual void OnMqttApplicationMessageReceived(MqttApplicationMessageReceivedEventArgs e)
+        /// <param name="args"></param>
+        protected virtual void OnMqttApplicationMessageReceived(MqttApplicationMessageReceivedEventArgs args)
         {
             if (MqttApplicationMessageReceived == null)
             {
-                logger.LogWarning("<<< Subscriber.OnMqttApplicationMessageReceived >>>: Mqtt messages will not be received. Event handler delegate not defined.");
+                Log.Warning("<<< Subscriber.OnMqttApplicationMessageReceived >>>: Mqtt messages will not be received. Event handler delegate not defined.");
             }
 
-            MqttApplicationMessageReceived?.Invoke(this, e);
+            MqttApplicationMessageReceived?.Invoke(this, args);
         }
     }
 }

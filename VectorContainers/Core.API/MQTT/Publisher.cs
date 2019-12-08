@@ -1,8 +1,11 @@
 ﻿using System;
-using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client.Options;
+using MQTTnet.Client.Publishing;
 using MQTTnet.Extensions.ManagedClient;
+using Serilog;
+using Serilog.Events;
 
 namespace Core.API.MQTT
 {
@@ -11,7 +14,6 @@ namespace Core.API.MQTT
         private readonly ulong id;
         private readonly string host;
         private readonly int port;
-        private readonly ILogger logger;
         private readonly IManagedMqttClient client;
 
         public Publisher(ulong id, string host, int port)
@@ -20,28 +22,43 @@ namespace Core.API.MQTT
             this.host = host;
             this.port = port;
 
-            var loggerFactory = new LoggerFactory();
-            logger = loggerFactory.CreateLogger<Publisher>();
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .WriteTo.File("MQTT.Publisher.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 2)
+                .CreateLogger();
 
             client = new MqttFactory().CreateManagedMqttClient();
 
-            Start();
+            client.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(e =>
+            {
+                Log.Error($"<<< Publisher >>>: Connecting failed! {e.Exception.ToString()}");
+            });
         }
 
         /// <summary>
         /// 
         /// </summary>
-        internal void Start()
+        public bool IsConnected => client.IsConnected;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public async Task<bool> Start()
         {
             var options = new ManagedMqttClientOptionsBuilder()
               .WithAutoReconnectDelay(TimeSpan.FromSeconds(5))
               .WithClientOptions(new MqttClientOptionsBuilder()
                   .WithClientId($"Publisher-{id}")
                   .WithTcpServer(host, port)
+                  .WithCommunicationTimeout(TimeSpan.FromSeconds(5))
                   .Build())
               .Build();
 
-            client.StartAsync(options);
+            await client.StartAsync(options);
+
+            return client.IsStarted;
         }
 
         /// <summary>
@@ -49,8 +66,10 @@ namespace Core.API.MQTT
         /// </summary>
         /// <param name="topic"></param>
         /// <param name="payload"></param>
-        public void Publish(string topic, byte[] payload)
+        public async Task<MqttClientPublishResult> Publish(string topic, byte[] payload)
         {
+            MqttClientPublishResult result = default;
+
             try
             {
                 var message = new MqttApplicationMessageBuilder()
@@ -58,12 +77,14 @@ namespace Core.API.MQTT
                    .WithPayload(payload)
                    .Build();
 
-                client.PublishAsync(message);
+                result = await client.PublishAsync(message);
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Publisher.Publish >>>: {ex.ToString()}");
+                Log.Error($"<<< Publisher.Publish >>>: {ex.ToString()}");
             }
+
+            return result;
         }
     }
 }

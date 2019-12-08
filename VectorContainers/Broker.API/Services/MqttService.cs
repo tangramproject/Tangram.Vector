@@ -27,14 +27,7 @@ namespace Broker.API.Services
         {
             try
             {
-                while (!stoppingToken.IsCancellationRequested)
-                {
-                    try
-                    {
-                        await mQTTServerProvider.Run();
-                    }
-                    catch { }
-                }
+                await mQTTServerProvider.Run();
             }
             catch (Exception ex)
             {

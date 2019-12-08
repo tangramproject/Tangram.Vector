@@ -1,10 +1,13 @@
 using System;
 using System.Diagnostics;
+using Broker.API.Services;
 using Broker.API.StartupExtentions;
+using Core.API.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Broker.API
 {
@@ -24,6 +27,8 @@ namespace Broker.API
 
         public void ConfigureServices(IServiceCollection services)
         {
+            var gatewaySection = Configuration.GetSection("Gateway");
+
             services.AddResponseCompression();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
             services.AddMvc(option => option.EnableEndpointRouting = false);
@@ -31,10 +36,17 @@ namespace Broker.API
             services.AddSwaggerGenOptions();
             services.AddHttpContextAccessor();
             services.AddOptions();
+            services.AddOnionServiceClientConfiguration();
+            services.AddOnionServiceClient();
+            services.AddHttpClientService(gatewaySection.GetValue<string>("Url"));
+            services.AddHttpClientHandler<Startup>();
+            services.AddBroadcastClient();
+            services.AddTorClient<Startup>();
+            services.AddMembershipServiceClient();
             services.AddMqttService();
         }
 
-        public void Configure(IApplicationBuilder app)
+        public void Configure(IApplicationBuilder app, IHostApplicationLifetime lifetime)
         {
             var pathBase = Configuration["PATH_BASE"];
             if (!string.IsNullOrEmpty(pathBase))
@@ -56,6 +68,16 @@ namespace Broker.API
                    c.OAuthClientId("brokerswaggerui");
                    c.OAuthAppName("Broker Swagger UI");
                });
+
+            lifetime.ApplicationStarted.Register(() =>
+            {
+                app.ApplicationServices.GetService<MqttService>();
+            });
+
+            lifetime.ApplicationStopping.Register(() =>
+            {
+                app.ApplicationServices.GetService<MqttService>().Dispose();
+            });
         }
     }
 }

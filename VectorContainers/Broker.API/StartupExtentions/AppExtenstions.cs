@@ -14,7 +14,7 @@ namespace Broker.API.StartupExtentions
         /// <returns></returns>
         public static IServiceCollection AddMqttService(this IServiceCollection services)
         {
-            services.AddTransient<MQTTServerProvider>();
+            services.AddSingleton<MQTTServerProvider>();
             services.AddHostedService<MqttService>();
             return services;
         }

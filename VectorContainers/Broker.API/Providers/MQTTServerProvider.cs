@@ -39,6 +39,7 @@ namespace Broker.API.Providers
                 var options = new MqttServerOptionsBuilder()
                     .WithApplicationMessageInterceptor(InterceptMessage)
                     .WithDefaultEndpointPort(1884)
+                    .WithMaxPendingMessagesPerClient(30)
                     .Build();
 
                 BootstrapClients();

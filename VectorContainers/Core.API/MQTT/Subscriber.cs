@@ -55,6 +55,8 @@ namespace Core.API.MQTT
                 .WithClientOptions(new MqttClientOptionsBuilder()
                     .WithClientId($"Subscriber-{id}")
                     .WithTcpServer(host, port)
+                    .WithKeepAlivePeriod(TimeSpan.FromSeconds(20))
+                    .WithKeepAliveSendInterval(TimeSpan.FromSeconds(10))
                     .WithCommunicationTimeout(TimeSpan.FromSeconds(5))
                     .Build())
                 .Build();

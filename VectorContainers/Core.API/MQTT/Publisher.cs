@@ -15,6 +15,7 @@ namespace Core.API.MQTT
         private readonly string host;
         private readonly int port;
         private readonly IManagedMqttClient client;
+        private readonly ClientStorageManager clientStorageManager;
 
         public Publisher(ulong id, string host, int port)
         {
@@ -35,6 +36,8 @@ namespace Core.API.MQTT
             {
                 Log.Error($"<<< Publisher >>>: Connecting failed! {e.Exception.ToString()}");
             });
+
+            clientStorageManager = new ClientStorageManager();
         }
 
         /// <summary>
@@ -49,9 +52,12 @@ namespace Core.API.MQTT
         {
             var options = new ManagedMqttClientOptionsBuilder()
               .WithAutoReconnectDelay(TimeSpan.FromSeconds(5))
+              .WithStorage(clientStorageManager)
               .WithClientOptions(new MqttClientOptionsBuilder()
                   .WithClientId($"Publisher-{id}")
                   .WithTcpServer(host, port)
+                  .WithKeepAlivePeriod(TimeSpan.FromSeconds(20))
+                  .WithKeepAliveSendInterval(TimeSpan.FromSeconds(10))
                   .WithCommunicationTimeout(TimeSpan.FromSeconds(5))
                   .Build())
               .Build();

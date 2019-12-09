@@ -59,6 +59,7 @@ namespace Core.API.MQTT
                     .WithKeepAlivePeriod(TimeSpan.FromSeconds(20))
                     .WithKeepAliveSendInterval(TimeSpan.FromSeconds(10))
                     .WithCommunicationTimeout(TimeSpan.FromSeconds(5))
+                    .WithCleanSession(false)
                     .Build())
                 .Build();
 

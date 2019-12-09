@@ -16,11 +16,13 @@ namespace Broker.API.Providers
         private readonly ILogger logger;
         private readonly IMqttServer server;
         private readonly List<INode> nodes;
+        private readonly int port;
 
-        public MQTTServerProvider(IHttpClientService httpClientService, ILogger<MQTTServerProvider> logger)
+        public MQTTServerProvider(IHttpClientService httpClientService, ILogger<MQTTServerProvider> logger, int port)
         {
             this.httpClientService = httpClientService;
             this.logger = logger;
+            this.port = port;
 
             nodes = new List<INode>();
             server = new MqttFactory().CreateMqttServer();
@@ -37,9 +39,12 @@ namespace Broker.API.Providers
             try
             {
                 var options = new MqttServerOptionsBuilder()
+                    .WithConnectionBacklog(100)
                     .WithApplicationMessageInterceptor(InterceptMessage)
-                    .WithDefaultEndpointPort(1884)
-                    .WithMaxPendingMessagesPerClient(30)
+                    .WithDefaultEndpointPort(port)
+                    .WithMaxPendingMessagesPerClient(50)
+                    .WithClientId($"Broker-{httpClientService.NodeIdentity}")
+                    .WithPersistentSessions()
                     .Build();
 
                 BootstrapClients();

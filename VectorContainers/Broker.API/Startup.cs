@@ -28,6 +28,7 @@ namespace Broker.API
         public void ConfigureServices(IServiceCollection services)
         {
             var gatewaySection = Configuration.GetSection("Gateway");
+            var brokerSection = Configuration.GetSection("Broker");
 
             services.AddResponseCompression();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
@@ -43,7 +44,7 @@ namespace Broker.API
             services.AddBroadcastClient();
             services.AddTorClient<Startup>();
             services.AddMembershipServiceClient();
-            services.AddMqttService();
+            services.AddMqttService(gatewaySection.GetValue<int>("port"));
         }
 
         public void Configure(IApplicationBuilder app, IHostApplicationLifetime lifetime)

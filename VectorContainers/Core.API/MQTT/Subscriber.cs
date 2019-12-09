@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client.Options;
 using MQTTnet.Extensions.ManagedClient;
+using MQTTnet.Protocol;
 using Serilog;
 using Serilog.Events;
 
@@ -62,7 +63,9 @@ namespace Core.API.MQTT
                 .Build();
 
             client.UseApplicationMessageReceivedHandler(OnMqttApplicationMessageReceived);
-            await client.SubscribeAsync(topic);
+
+
+            await client.SubscribeAsync(topic, MqttQualityOfServiceLevel.AtLeastOnce);
             await client.StartAsync(options);
 
             return client.IsStarted;

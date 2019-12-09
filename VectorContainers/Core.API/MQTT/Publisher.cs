@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client.Options;
@@ -81,6 +82,7 @@ namespace Core.API.MQTT
                 var message = new MqttApplicationMessageBuilder()
                    .WithTopic(topic)
                    .WithPayload(payload)
+                   .WithAtLeastOnceQoS()
                    .Build();
 
                 result = await client.PublishAsync(message);
@@ -91,6 +93,15 @@ namespace Core.API.MQTT
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public IList<ManagedMqttApplicationMessage> GetStoredMessages()
+        {
+            return clientStorageManager.GetMessages();
         }
     }
 }

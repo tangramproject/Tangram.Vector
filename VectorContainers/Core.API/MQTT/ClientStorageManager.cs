@@ -49,7 +49,7 @@ namespace Core.API.MQTT
         /// 
         /// </summary>
         /// <returns></returns>
-        public IList<ManagedMqttApplicationMessage> GetMessages()
+        public IList<ManagedMqttApplicationMessage> GetRetainedMessages()
         {
             return new ReadOnlyCollection<ManagedMqttApplicationMessage>(retainedMessages);
         }

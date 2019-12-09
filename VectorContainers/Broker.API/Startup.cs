@@ -44,7 +44,7 @@ namespace Broker.API
             services.AddBroadcastClient();
             services.AddTorClient<Startup>();
             services.AddMembershipServiceClient();
-            services.AddMqttService(gatewaySection.GetValue<int>("port"));
+            services.AddMqttService(brokerSection.GetValue<int>("port"));
         }
 
         public void Configure(IApplicationBuilder app, IHostApplicationLifetime lifetime)

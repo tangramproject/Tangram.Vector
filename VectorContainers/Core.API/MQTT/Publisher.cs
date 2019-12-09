@@ -60,7 +60,6 @@ namespace Core.API.MQTT
                   .WithKeepAlivePeriod(TimeSpan.FromSeconds(20))
                   .WithKeepAliveSendInterval(TimeSpan.FromSeconds(10))
                   .WithCommunicationTimeout(TimeSpan.FromSeconds(5))
-                  .WithCleanSession(false)
                   .Build())
               .Build();
 
@@ -100,9 +99,9 @@ namespace Core.API.MQTT
         /// 
         /// </summary>
         /// <returns></returns>
-        public IList<ManagedMqttApplicationMessage> GetStoredMessages()
+        public IList<ManagedMqttApplicationMessage> GetRetainedMessages()
         {
-            return clientStorageManager.GetMessages();
+            return clientStorageManager.GetRetainedMessages();
         }
     }
 }

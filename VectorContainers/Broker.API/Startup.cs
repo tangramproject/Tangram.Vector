@@ -39,7 +39,7 @@ namespace Broker.API
             services.AddOptions();
             services.AddOnionServiceClientConfiguration();
             services.AddOnionServiceClient();
-            services.AddHttpClientService(gatewaySection.GetValue<string>("Url"));
+            services.AddHttpClientService(gatewaySection.GetValue<string>("url"));
             services.AddHttpClientHandler<Startup>();
             services.AddBroadcastClient();
             services.AddTorClient<Startup>();

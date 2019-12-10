@@ -1,21 +1,24 @@
 ﻿using System;
+using System.Threading.Tasks;
+using Core.API.MQTT;
 using MQTTnet;
 using MQTTnet.Client.Options;
 using MQTTnet.Extensions.ManagedClient;
 using Serilog;
 using Serilog.Events;
 
-namespace Broker.API.Nodes
+namespace Broker.API.Node
 {
-    public class Node: INode
+    public class RemoteNode : INode
     {
         private readonly ulong id;
         private readonly string host;
         private readonly int port;
+        private readonly ClientStorageManager clientStorageManager;
 
         private IManagedMqttClient client;
 
-        public Node(ulong id, string host, int port)
+        public RemoteNode(ulong id, string host, int port)
         {
             this.id = id;
             this.host = host;
@@ -27,6 +30,8 @@ namespace Broker.API.Nodes
                 .Enrich.FromLogContext()
                 .WriteTo.File("MQTT.Node.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 2)
                 .CreateLogger();
+
+            clientStorageManager = new ClientStorageManager(@$"RetainedMessages-{id}.json");
         }
 
         /// <summary>
@@ -41,7 +46,7 @@ namespace Broker.API.Nodes
         /// <summary>
         /// 
         /// </summary>
-        public void Start()
+        public async Task<bool> Start()
         {
             Log.Information($"Starting replication client {this}...");
 
@@ -50,20 +55,26 @@ namespace Broker.API.Nodes
             client.UseDisconnectedHandler(args => Log.Information($"Replication client disconnected {this}"));
             var options = new ManagedMqttClientOptionsBuilder()
                 .WithAutoReconnectDelay(TimeSpan.FromSeconds(5))
+                .WithStorage(clientStorageManager)
                 .WithClientOptions(new MqttClientOptionsBuilder()
                     .WithClientId($"Replication-{id}")
                     .WithTcpServer(host, port)
+                    .WithKeepAlivePeriod(TimeSpan.FromSeconds(20))
+                    .WithKeepAliveSendInterval(TimeSpan.FromSeconds(10))
+                    .WithCommunicationTimeout(TimeSpan.FromSeconds(5))
                     .Build())
                 .Build();
 
-            client.StartAsync(options);
+            await client.StartAsync(options);
+
+            return client.IsStarted;
         }
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="message"></param>
-        public void ReplicateMessage(MqttApplicationMessage message)
+        public async Task ReplicateMessage(MqttApplicationMessage message)
         {
             var replicated = new MqttApplicationMessageBuilder()
                     .WithTopic($"{Extentions.MqttApplicationMessageExtensions.ReplicationTopic}{message.Topic}")
@@ -97,7 +108,7 @@ namespace Broker.API.Nodes
                 }
             }
 
-            var result = client.PublishAsync(replicated.Build()).Result;
+            var result = await client.PublishAsync(replicated.Build());
 
             Log.Information($"Replicating message to {this}... {result.ReasonCode}");
         }

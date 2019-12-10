@@ -29,7 +29,7 @@ namespace Core.API.Model
             {
                 Document = new DocumentStore
                 {
-                    Urls = new[] { configuration["Database:Url"] },
+                    Urls = new[] { configuration["Database:url"] },
                     Conventions =
                 {
                     MaxNumberOfRequestsPerSession = 30,

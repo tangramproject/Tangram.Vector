@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using MQTTnet.Extensions.ManagedClient;
@@ -10,12 +9,17 @@ namespace Core.API.MQTT
 {
     public class ClientStorageManager : IManagedMqttClientStorage
     {
-        private const string filename = @"RetainedMessages.json";
-        private IList<ManagedMqttApplicationMessage> retainedMessages;
+        private readonly string filename = @"RetainedMessages.json";
+        private IList<ManagedMqttApplicationMessage> retainedMessages = new List<ManagedMqttApplicationMessage>();
 
         public ClientStorageManager()
         {
-            retainedMessages = new List<ManagedMqttApplicationMessage>();
+
+        }
+
+        public ClientStorageManager(string filename)
+        {
+            this.filename = filename;
         }
 
         /// <summary>

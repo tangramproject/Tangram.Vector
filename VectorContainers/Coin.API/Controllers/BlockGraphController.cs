@@ -8,6 +8,7 @@ using Core.API.Actors.Providers;
 using Core.API.Helper;
 using Core.API.Model;
 using Core.API.Network;
+using Core.API.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -17,13 +18,13 @@ namespace Coin.API.Controllers
     [Route("api/[controller]")]
     public class BlockGraphController : Controller
     {
-        private readonly IBlockGraphService blockGraphService;
+        private readonly IBlockGraphService<CoinProto> blockGraphService;
         private readonly IHttpClientService httpClientService;
         private readonly INetworkActorProvider networkProvider;
         private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
 
-        public BlockGraphController(IBlockGraphService blockGraphService, IHttpClientService httpClientService,
+        public BlockGraphController(IBlockGraphService<CoinProto> blockGraphService, IHttpClientService httpClientService,
             INetworkActorProvider networkProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphController> logger)
         {
             this.blockGraphService = blockGraphService;

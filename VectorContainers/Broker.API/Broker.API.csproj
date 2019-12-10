@@ -12,7 +12,7 @@
     <Folder Include="StartupExtentions\" />
     <Folder Include="Providers\" />
     <Folder Include="Extentions\" />
-    <Folder Include="Nodes\" />
+    <Folder Include="Node\" />
     <Folder Include="Controllers\" />
   </ItemGroup>
   <ItemGroup>

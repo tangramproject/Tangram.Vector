@@ -13,6 +13,31 @@ namespace Core.API.Extensions
         /// <summary>
         /// 
         /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddPubSubProvider<TAttach>(this IServiceCollection services)
+        {
+            services.AddSingleton<PubSubProvider<TAttach>>();
+            services.AddHostedService<PubSubService<TAttach>>();
+            return services;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddBlockGraphService<TAttach>(this IServiceCollection services)
+        {
+            services.AddTransient<IBlockGraphService<TAttach>, BlockGraphService<TAttach>>();
+            return services;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="services"></param>
         /// <returns></returns>
         public static IServiceCollection AddSyncProvider<TAttach>(this IServiceCollection services, string route)

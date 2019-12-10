@@ -6,7 +6,8 @@ using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Server;
 using System.Collections.Generic;
-using Broker.API.Nodes;
+using Broker.API.Node;
+using System.Linq;
 
 namespace Broker.API.Providers
 {
@@ -68,9 +69,6 @@ namespace Broker.API.Providers
             if (context.ApplicationMessage.IsReplicated())
             {
                 context.ApplicationMessage.Topic = context.ApplicationMessage.Topic.Substring(Extentions.MqttApplicationMessageExtensions.ReplicationTopic.Length);
-            }
-            else
-            {
                 Task.Factory.StartNew(() =>
                     Parallel.ForEach(nodes, (node) =>
                     {
@@ -94,14 +92,22 @@ namespace Broker.API.Providers
         {
             logger.LogInformation("Bootstrapping replication clients...");
 
-            foreach (var member in httpClientService.Members)
-            {
-                var url = new Uri(member.Value);
-                var node = new Node(member.Key, url.Host, url.Port);
+            nodes.AddRange((from member in httpClientService.Members
+                            let url = new Uri(member.Value)
+                            let node = new RemoteNode(member.Key, url.Host, url.Port)
+                            select node).Select(node => node));
 
-                nodes.Add(node);
-                node.Start();
-            }
+            Parallel.ForEach(nodes, (node) =>
+            {
+                try
+                {
+                    var isStarted = node.Start().GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"<<< MQTTServerProvider.BootstrapClients >>>: {ex.ToString()}");
+                }
+            });
         }
     }
 }

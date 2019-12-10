@@ -52,13 +52,13 @@ namespace Coin.API
             services.AddOptions();
             services.Configure<BlockmainiaOptions>(Configuration);
             services.AddSyncProvider<CoinProto>("coins");
-            services.AddBroadcastProvider<CoinProto>();
+            services.AddPubSubProvider<CoinProto>();
             //services.AddMissingBlocksProvider();
             services.AddDbContext();
             services.AddUnitOfWork();
             services.AddOnionServiceClientConfiguration();
             services.AddOnionServiceClient();
-            services.AddHttpClientService(gatewaySection.GetValue<string>("Url"));
+            services.AddHttpClientService(gatewaySection.GetValue<string>("url"));
             services.AddHttpClientHandler<Startup>();
             services.AddBroadcastClient();
             services.AddTorClient<Startup>();
@@ -69,7 +69,7 @@ namespace Coin.API
             services.AddInterpretActorProvider<CoinProto>(InterpretBlockActor.Create);
             services.AddProcessActorProvider<CoinProto>();
             services.AddSipActorProvider<Startup, CoinProto>();
-            services.AddBlockGraphService();
+            services.AddBlockGraphService<CoinProto>();
             services.AddCoinService();
         }
 

@@ -6,7 +6,17 @@ namespace Core.API.Helper
 {
     public class AsyncLock : IDisposable
     {
-        private SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1, 1);
+        private SemaphoreSlim semaphoreSlim;
+
+        public AsyncLock()
+        {
+            semaphoreSlim = new SemaphoreSlim(1, 1);
+        }
+
+        public AsyncLock(SemaphoreSlim semaphoreSlim)
+        {
+            this.semaphoreSlim = semaphoreSlim;
+        }
 
         public async Task<AsyncLock> LockAsync()
         {

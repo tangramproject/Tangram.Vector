@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Coin.API.Model;
 using Core.API.Actors.Providers;
 using Core.API.Extentions;
 using Core.API.Helper;
@@ -9,24 +8,24 @@ using Core.API.Messages;
 using Core.API.Model;
 using Microsoft.Extensions.Logging;
 
-namespace Coin.API.Services
+namespace Core.API.Services
 {
-    public class BlockGraphService : IBlockGraphService
+    public class BlockGraphService<TAttach> : IBlockGraphService<TAttach>
     {
         private static readonly AsyncLock setBlockGraphMutex = new AsyncLock();
 
         private readonly ISipActorProvider sipActorProvider;
         private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
-        private readonly IBaseGraphRepository<CoinProto> baseGraphRepository;
+        private readonly IBaseGraphRepository<TAttach> baseGraphRepository;
 
-        public BlockGraphService(ISipActorProvider sipActorProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphService> logger)
+        public BlockGraphService(ISipActorProvider sipActorProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphService<TAttach>> logger)
         {
             this.sipActorProvider = sipActorProvider;
             this.unitOfWork = unitOfWork;
             this.logger = logger;
 
-            baseGraphRepository = unitOfWork.CreateBaseGraphOf<CoinProto>();
+            baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
         }
 
         /// <summary>
@@ -34,7 +33,7 @@ namespace Coin.API.Services
         /// </summary>
         /// <param name="blockGraph"></param>
         /// <returns></returns>
-        public async Task<BaseGraphProto<CoinProto>> SetBlockGraph(BaseGraphProto<CoinProto> blockGraph)
+        public async Task<BaseGraphProto<TAttach>> SetBlockGraph(BaseGraphProto<TAttach> blockGraph)
         {
             if (blockGraph == null)
                 throw new ArgumentNullException(nameof(blockGraph));
@@ -50,7 +49,7 @@ namespace Coin.API.Services
                     }
 
 
-                    var stored = await baseGraphRepository.StoreOrUpdate(new BaseGraphProto<CoinProto>
+                    var stored = await baseGraphRepository.StoreOrUpdate(new BaseGraphProto<TAttach>
                     {
                         Block = blockGraph.Block,
                         Deps = blockGraph.Deps?.Select(d => d).ToList(),

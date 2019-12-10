@@ -7,19 +7,20 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using Core.API.Network;
 using Coin.API.Model;
+using Core.API.Services;
 
 namespace Coin.API.Services
 {
     public class CoinService : ICoinService
     {
         private readonly IUnitOfWork unitOfWork;
-        private readonly IBlockGraphService blockGraphService;
+        private readonly IBlockGraphService<CoinProto> blockGraphService;
         private readonly IHttpClientService httpClientService;
         private readonly ILogger logger;
         private readonly IBaseGraphRepository<CoinProto> baseGraphRepository;
         private readonly IBaseBlockIDRepository<CoinProto> baseBlockIDRepository;
 
-        public CoinService(IUnitOfWork unitOfWork, IBlockGraphService blockGraphService, IHttpClientService httpClientService, ILogger<CoinService> logger)
+        public CoinService(IUnitOfWork unitOfWork, IBlockGraphService<CoinProto> blockGraphService, IHttpClientService httpClientService, ILogger<CoinService> logger)
         {
             this.unitOfWork = unitOfWork;
             this.blockGraphService = blockGraphService;

@@ -12,17 +12,6 @@ namespace Coin.API.StartupExtensions
         /// </summary>
         /// <param name="services"></param>
         /// <returns></returns>
-        public static IServiceCollection AddBlockGraphService(this IServiceCollection services)
-        {
-            services.AddTransient<IBlockGraphService, BlockGraphService>();
-            return services;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="services"></param>
-        /// <returns></returns>
         public static IServiceCollection AddCoinService(this IServiceCollection services)
         {
             services.AddTransient<ICoinService, CoinService>();

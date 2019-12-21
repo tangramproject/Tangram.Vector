@@ -14,5 +14,6 @@ namespace Core.API.Model
         Task<IEnumerable<TEntity>> GetWhere(Expression<Func<TEntity, bool>> expression);
         Task<TEntity> GetFirstOrDefault(Expression<Func<TEntity, bool>> expression);
         Task<TEntity> GetLast(Expression<Func<TEntity, bool>> expression);
+        Task<TEntity> GetLast();
     }
 }

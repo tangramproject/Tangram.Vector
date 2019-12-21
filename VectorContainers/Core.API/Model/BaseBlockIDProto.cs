@@ -17,6 +17,8 @@ namespace Core.API.Model
         public ulong Round { get; set; }
         [ProtoMember(4)]
         public BaseBlockProto<TAttach> SignedBlock { get; set; }
+        [ProtoMember(5)]
+        public string PreviousHash { get; set; }
 
         public override string ToString()
         {

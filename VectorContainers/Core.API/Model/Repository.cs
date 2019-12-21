@@ -174,6 +174,27 @@ namespace Core.API.Model
         /// <summary>
         /// 
         /// </summary>
+        /// <returns></returns>
+        public Task<TEntity> GetLast()
+        {
+            TEntity entity = default;
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+                entity = session.Query<TEntity>().LastOrDefault();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Repository.GetLast >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(entity);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="expression"></param>
         /// <returns></returns>
         public Task<IEnumerable<TEntity>> GetWhere(Expression<Func<TEntity, bool>> expression)

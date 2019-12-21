@@ -14,6 +14,10 @@ namespace Core.API.Model
         public string PublicKey { get; set; }
         [ProtoMember(4)]
         public string Signature { get; set; }
+        [ProtoMember(5)]
+        public long Epoch { get; set; }
+        [ProtoMember(6)]
+        public long Height { get; set; }
 
         /// <summary>
         /// 

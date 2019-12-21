@@ -52,6 +52,7 @@
     <PackageReference Include="MQTTnet.Extensions.ManagedClient" Version="3.0.8" />
     <PackageReference Include="MQTTnet.Extensions.Rpc" Version="3.0.8" />
     <PackageReference Include="Serilog.Sinks.File" Version="4.1.0" />
+    <PackageReference Include="libsignal-protocol-dotnet" Version="2.7.0" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="IntervalClocks\" />
@@ -69,6 +70,7 @@
     <Folder Include="Extensions\" />
     <Folder Include="Middlewares\" />
     <Folder Include="MQTT\" />
+    <Folder Include="TimeLock\" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="libs\libhydrogen.a" />

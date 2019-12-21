@@ -6,6 +6,7 @@
         ulong Node { get; set; }
         ulong Round { get; set; }
         BaseBlockProto<TAttach> SignedBlock { get; set; }
+        string PreviousHash { get; set; }
 
         string ToString();
     }

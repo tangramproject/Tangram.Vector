@@ -1,9 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Core.API.Extentions;
 using Core.API.Model;
-using Core.API.Network;
 using libsignal.ecc;
 using Microsoft.Extensions.Logging;
 
@@ -12,14 +12,14 @@ namespace Core.API.POS
     public class LotteryService<TAttach> : ILotteryService
     {
         private readonly IUnitOfWork unitOfWork;
-        private readonly IHttpClientService httpClientService;
         private readonly ILogger logger;
         private readonly IBaseGraphRepository<TAttach> baseGraphRepository;
 
-        public LotteryService(IUnitOfWork unitOfWork, IHttpClientService httpClientService, ILogger<LotteryService<TAttach>> logger)
+        private readonly List<LotteryTicketProto> tmpList = new List<LotteryTicketProto>();
+
+        public LotteryService(IUnitOfWork unitOfWork, ILogger<LotteryService<TAttach>> logger)
         {
             this.unitOfWork = unitOfWork;
-            this.httpClientService = httpClientService;
             this.logger = logger;
 
             baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
@@ -37,18 +37,28 @@ namespace Core.API.POS
         /// <summary>
         /// 
         /// </summary>
+        /// <param name="lotteryTicket"></param>
+        public void Register(LotteryTicketProto lotteryTicket)
+        {
+            tmpList.Add(lotteryTicket);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <returns></returns>
         public async Task<LotteryWinnerProto> PickWinner()
         {
             var graphProto = await baseGraphRepository.GetLast();
 
+            var tickets = tmpList.Select(x => x.SerialNumber).ToArray();
             var keyPair = GenerateKeyPair();
-            var provableMessage = string.Join(".", httpClientService.Members.Keys.ToArray()) + $".{graphProto.Block.SignedBlock.Signature}";
+            var provableMessage = string.Join(".", tickets) + $".{graphProto.Block.SignedBlock.Signature}";
 
             var proof = Curve.calculateVrfSignature(keyPair.getPrivateKey(), provableMessage.ToBytes());
             var vrfBytes = Curve.verifyVrfSignature(keyPair.getPublicKey(), provableMessage.ToBytes(), proof);
 
-            var winners = PickRandomParticipants(httpClientService.Members.Keys.ToArray(), vrfBytes);
+            var winners = PickRandomParticipants(tickets, vrfBytes);
 
             var lotteryWinner = new LotteryWinnerProto
             {
@@ -88,7 +98,7 @@ namespace Core.API.POS
                 var vrfBytes = Curve.verifyVrfSignature(ecPubKey, lotteryWinner.Message.ToBytes(), lotteryWinner.Proof.FromHex());
 
                 var provableMessage = lotteryWinner.Message.Substring(0, lotteryWinner.Message.Length + 1 - blockSignature.Length);
-                var participants = provableMessage.Split('.').Select(x => Convert.ToUInt64(x));
+                var participants = provableMessage.Split('.').Select(x => x);
 
                 var winners = PickRandomParticipants(participants.ToArray(), vrfBytes);
             }
@@ -107,9 +117,9 @@ namespace Core.API.POS
         /// <param name="participants"></param>
         /// <param name="seed"></param>
         /// <returns></returns>
-        public ulong[] PickRandomParticipants(ulong[] participants, byte[] seed)
+        public string[] PickRandomParticipants(string[] participants, byte[] seed)
         {
-            var winners = new ulong[participants.Length];
+            var winners = new string[participants.Length];
             participants.CopyTo(winners, 0);
 
             KnuthShuffle(winners, seed);

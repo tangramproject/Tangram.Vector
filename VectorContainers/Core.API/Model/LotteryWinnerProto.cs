@@ -8,9 +8,9 @@ namespace Core.API.Model
         [ProtoMember(1)]
         public long BlockHeight { get; set; }
         [ProtoMember(2)]
-        public ulong Winner { get; set; }
+        public string Winner { get; set; }
         [ProtoMember(3)]
-        public ulong[] Witnesses { get; set; }
+        public string[] Witnesses { get; set; }
         [ProtoMember(4)]
         public string Proof { get; set; }
         [ProtoMember(5)]
@@ -21,5 +21,7 @@ namespace Core.API.Model
         public string PublicKey { get; set; }
         [ProtoMember(8)]
         public string Signature { get; set; }
+        [ProtoMember(9)]
+        public string EventHash { get; set; }
     }
 }

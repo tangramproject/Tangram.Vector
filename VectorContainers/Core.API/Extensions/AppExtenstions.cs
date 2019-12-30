@@ -1,5 +1,6 @@
 ﻿using Core.API.Actors.Providers;
 using Core.API.Model;
+using Core.API.MQTT;
 using Core.API.Network;
 using Core.API.Providers;
 using Core.API.Services;
@@ -16,9 +17,20 @@ namespace Core.API.Extensions
         /// <typeparam name="TAttach"></typeparam>
         /// <param name="services"></param>
         /// <returns></returns>
-        public static IServiceCollection AddPubSubProvider<TAttach>(this IServiceCollection services)
+        public static IServiceCollection AddPubSubProvider<TAttach>(this IServiceCollection services, NodeEndPoint nodeEndPoint)
         {
-            services.AddSingleton<PubSubProvider<TAttach>>();
+            services.AddSingleton(sp =>
+            {
+                var pubSubProvider = new PubSubProvider<TAttach>(
+                    sp.GetService<IUnitOfWork>(),
+                    sp.GetService<IHttpClientService>(),
+                    sp.GetService<IBlockGraphService<TAttach>>(),
+                    sp.GetService<ILogger<PubSubProvider<TAttach>>>(),
+                    nodeEndPoint
+                );
+
+                return pubSubProvider;
+            });
             services.AddHostedService<PubSubService<TAttach>>();
             return services;
         }

@@ -42,6 +42,7 @@ namespace Coin.API
         public void ConfigureServices(IServiceCollection services)
         {
             var gatewaySection = Configuration.GetSection("Gateway");
+            var brokerSection = Configuration.GetSection("Broker");
 
             services.AddResponseCompression();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
@@ -52,7 +53,7 @@ namespace Coin.API
             services.AddOptions();
             services.Configure<BlockmainiaOptions>(Configuration);
             services.AddSyncProvider<CoinProto>("coins");
-            services.AddPubSubProvider<CoinProto>();
+            services.AddPubSubProvider<CoinProto>(new Core.API.MQTT.NodeEndPoint(brokerSection.GetValue<string>("host"), brokerSection.GetValue<int>("port")));
             //services.AddMissingBlocksProvider();
             services.AddDbContext();
             services.AddUnitOfWork();

@@ -1,4 +1,13 @@
-## Running a node
+# Running a node
+
+## Minimum hardware requirements
+
+CPU —Single Core (1-Thread)
+RAM — 1GB RAM DDR4
+OS — Any Linux distro
+
+NB - Tangram Vector is a live system, and the hardware requirements may change.
+
 
 ## Building Vector
 git clone https://github.com/tangramproject/Tangram.Vector

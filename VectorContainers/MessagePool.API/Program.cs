@@ -49,7 +49,7 @@ namespace MessagePool.API
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder
-                .UseUrls("http://localhost:6001")
+                .UseUrls("http://0.0.0.0:6001")
                 .UseStartup<Startup>()
                 .UseSerilog();
             });

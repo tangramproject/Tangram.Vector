@@ -49,7 +49,7 @@ namespace Broker.API
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder
-                .UseUrls("http://localhost:2001")
+                .UseUrls("http://0.0.0.0:2001")
                 .UseStartup<Startup>()
                 .UseSerilog();
             });

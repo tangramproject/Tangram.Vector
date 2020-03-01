@@ -49,7 +49,7 @@ namespace Onion.API
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder
-                .UseUrls("http://localhost:3001")
+                .UseUrls("http://0.0.0.0:3001")
                 .UseStartup<Startup>()
                 .UseSerilog();
             });

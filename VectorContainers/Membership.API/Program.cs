@@ -49,7 +49,7 @@ namespace Membership.API
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder
-                .UseUrls("http://localhost:4001")
+                .UseUrls("http://0.0.0.0:4001")
                 .UseStartup<Startup>()
                 .UseSerilog();
             });

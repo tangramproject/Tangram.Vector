@@ -49,7 +49,7 @@ namespace Coin.API
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder
-                .UseUrls("http://localhost:5001")
+                .UseUrls("http://0.0.0.0:5001")
                 .UseStartup<Startup>()
                 .UseSerilog();
             });

@@ -12,14 +12,10 @@ jobs:
         token: ${{secrets.github_token}}
     - name: Print new build number
       run: echo Build number is $BUILD_NUMBER
-    - name: Setup .NET Core 2.2
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '2.2.402' # SDK Version to use.
     - name: Setup .NET Core 3.0
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: '3.0.100' # SDK Version to use.
+        dotnet-version: '3.1.200' # SDK Version to use.
     - name: Checkout latest
       uses: actions/checkout@master
     - name: Build Vector

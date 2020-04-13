@@ -25,7 +25,7 @@ namespace Core.API.Helper
         public static byte[] GetZeroBytes()
         {
             byte[] bytes = new byte[0];
-            if ((bytes[bytes.Length - 1] & 0x80) != 0)
+            if ((bytes[^1] & 0x80) != 0)
             {
                 Array.Resize(ref bytes, bytes.Length + 1);
             }
@@ -90,13 +90,11 @@ namespace Core.API.Helper
             if (stream == null || stream.CanRead == false)
                 return default;
 
-            using (var sr = new StreamReader(stream))
-            using (var jtr = new JsonTextReader(sr))
-            {
-                var js = new JsonSerializer();
-                var searchResult = js.Deserialize<T>(jtr);
-                return searchResult;
-            }
+            using var sr = new StreamReader(stream);
+            using var jtr = new JsonTextReader(sr);
+            var js = new JsonSerializer();
+            var searchResult = js.Deserialize<T>(jtr);
+            return searchResult;
         }
 
         public static async Task<string> StreamToStringAsync(Stream stream)
@@ -156,7 +154,6 @@ namespace Core.API.Helper
 
         public static long GetInt64HashCode(byte[] hash)
         {
-            long hashCode = 0;
             //32Byte hashText separate
             //hashCodeStart = 0~7  8Byte
             //hashCodeMedium = 8~23  8Byte
@@ -166,7 +163,7 @@ namespace Core.API.Helper
             var hashCodeMedium = BitConverter.ToInt64(hash, 8);
             var hashCodeEnd = BitConverter.ToInt64(hash, 24);
 
-            hashCode = hashCodeStart ^ hashCodeMedium ^ hashCodeEnd;
+            long hashCode = hashCodeStart ^ hashCodeMedium ^ hashCodeEnd;
 
             return hashCode;
         }
@@ -175,11 +172,9 @@ namespace Core.API.Helper
         {
             try
             {
-                using (var ms = new MemoryStream())
-                {
-                    Serializer.Serialize(ms, data);
-                    return ms.ToArray();
-                }
+                using var ms = new MemoryStream();
+                Serializer.Serialize(ms, data);
+                return ms.ToArray();
             }
             catch (Exception ex)
             {
@@ -191,10 +186,8 @@ namespace Core.API.Helper
         {
             try
             {
-                using (var ms = new MemoryStream(data))
-                {
-                    return Serializer.Deserialize<T>(ms);
-                }
+                using var ms = new MemoryStream(data);
+                return Serializer.Deserialize<T>(ms);
             }
             catch (Exception ex)
             {
@@ -208,13 +201,11 @@ namespace Core.API.Helper
 
             try
             {
-                using (var ms = new MemoryStream(data))
+                using var ms = new MemoryStream(data);
+                T item;
+                while ((item = Serializer.DeserializeWithLengthPrefix<T>(ms, PrefixStyle.Base128, fieldNumber: 1)) != null)
                 {
-                    T item;
-                    while ((item = Serializer.DeserializeWithLengthPrefix<T>(ms, PrefixStyle.Base128, fieldNumber: 1)) != null)
-                    {
-                        list.Add(item);
-                    }
+                    list.Add(item);
                 }
             }
             catch (Exception ex)
@@ -233,13 +224,22 @@ namespace Core.API.Helper
             return ret;
         }
 
-        public static ulong HashToId(string hash)
+        public static byte[] Combine(byte[] first, byte[] second, byte[] third)
+        {
+            byte[] ret = new byte[first.Length + second.Length + third.Length];
+            Buffer.BlockCopy(first, 0, ret, 0, first.Length);
+            Buffer.BlockCopy(second, 0, ret, first.Length, second.Length);
+            Buffer.BlockCopy(third, 0, ret, second.Length, third.Length);
+            return ret;
+        }
+
+        public static ulong HashToId(string hash, int xBase)
         {
             if (hash == null)
                 throw new ArgumentNullException(nameof(hash));
 
             var v = new StringBuilder();
-            ulong node;
+            ulong id;
 
             try
             {
@@ -251,15 +251,15 @@ namespace Core.API.Helper
 
                 var byteHex = Cryptography.GenericHashNoKey(v.ToString());
 
-                node = (ulong)BitConverter.ToInt64(byteHex, 0);
-                node = (ulong)Convert.ToInt64(node.ToString().Substring(0, 5));
+                id = (ulong)BitConverter.ToInt64(byteHex, 0);
+                id = (ulong)Convert.ToInt64(id.ToString().Substring(0, xBase));
             }
             catch (Exception ex)
             {
                 throw ex;
             }
 
-            return node;
+            return id;
         }
 
         public static JToken ReadJToken(HttpResponseMessage httpResponseMessage, string attr)
@@ -282,5 +282,41 @@ namespace Core.API.Helper
                 array[i] = t;
             }
         }
+
+
+        public static BigInteger Exp(BigInteger a, BigInteger exponent, BigInteger n)
+        {
+            if (exponent < 0)
+                throw new Exception("Cannot raise a BigInteger to a negative power.", null);
+
+            if (n < new BigInteger(2))
+                throw new Exception("Cannot perform a modulo operation against a BigInteger less than 2.", null);
+
+            if (BigInteger.Abs(a) >= n)
+            {
+                a %= n;
+            }
+            if (a.Sign == 1)
+            {
+                a += n;
+            }
+
+            if (a == new BigInteger())
+                return new BigInteger();
+
+            BigInteger res = new BigInteger(1);
+            BigInteger factor = new BigInteger(a.ToByteArray());
+
+            while (exponent > new BigInteger())
+            {
+                if (exponent % new BigInteger(2) == new BigInteger())
+                    res = (res * factor) % n;
+                exponent /= new BigInteger(2);
+                factor = (factor * factor) % n;
+            }
+
+            return res;
+        }
+
     }
 }

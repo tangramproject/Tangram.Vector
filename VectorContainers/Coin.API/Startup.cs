@@ -14,6 +14,8 @@ using Core.API.Middlewares;
 using Core.API.Actors.Providers;
 using Core.API.Extensions;
 using Coin.API.Model;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 
 namespace Coin.API
 {
@@ -50,6 +52,7 @@ namespace Coin.API
             services.AddControllers();
             services.AddSwaggerGenOptions();
             services.AddHttpContextAccessor();
+            services.AddDataProtection().AddKeyManagementOptions(options => options.XmlRepository = services.BuildServiceProvider().GetService<IXmlRepository>());
             services.AddOptions();
             services.Configure<BlockmainiaOptions>(Configuration);
             services.AddSyncProvider<CoinProto>("coins");

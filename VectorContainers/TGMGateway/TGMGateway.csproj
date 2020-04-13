@@ -28,7 +28,7 @@
       <Publish Condition="'%(PackageReference.Version)' == ''">true</Publish>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.9.10" />
-    <PackageReference Include="Ocelot" Version="14.1.0" />
+    <PackageReference Include="Ocelot" Version="15.0.2" />
     <PackageReference Include="OctoPack" Version="3.6.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>

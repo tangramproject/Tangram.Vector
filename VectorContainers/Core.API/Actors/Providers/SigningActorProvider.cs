@@ -57,7 +57,7 @@ namespace Core.API.Actors.Providers
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        public async Task<bool> VerifiySignature(VerifiySignatureMessage message)
+        public async Task<bool> VerifiySignature(VerifySignatureMessage message)
         {
             return await actor.Ask<bool>(message);
         }

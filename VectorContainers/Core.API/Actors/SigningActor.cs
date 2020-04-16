@@ -20,7 +20,7 @@ namespace Core.API.Actors
 
             logger = Context.GetLogger();
 
-            Receive<VerifiySignatureMessage>(message => Sender.Tell(VerifiySignature(message)));
+            Receive<VerifySignatureMessage>(message => Sender.Tell(VerifiySignature(message)));
 
             ReceiveAsync<SignedHashMessage>(async message => Sender.Tell(await Sign(message)));
 
@@ -79,7 +79,7 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        private bool VerifiySignature(VerifiySignatureMessage message)
+        private bool VerifiySignature(VerifySignatureMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));

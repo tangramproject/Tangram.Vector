@@ -9,6 +9,6 @@ namespace Core.API.Actors.Providers
         Task<SignedHashResponse> Sign(SignedBlockMessage message);
         Task<SignedHashResponse> Sign(SignedHashMessage message);
         Task<bool> VerifiyBlockSignature<TModel>(VerifiyBlockSignatureMessage<TModel> message);
-        Task<bool> VerifiySignature(VerifiySignatureMessage message);
+        Task<bool> VerifiySignature(VerifySignatureMessage message);
     }
 }

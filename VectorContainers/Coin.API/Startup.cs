@@ -16,6 +16,7 @@ using Core.API.Extensions;
 using Coin.API.Model;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.Repositories;
+using Core.API.Model;
 
 namespace Coin.API
 {
@@ -52,12 +53,10 @@ namespace Coin.API
             services.AddControllers();
             services.AddSwaggerGenOptions();
             services.AddHttpContextAccessor();
-            services.AddDataProtection().AddKeyManagementOptions(options => options.XmlRepository = services.BuildServiceProvider().GetService<IXmlRepository>());
             services.AddOptions();
             services.Configure<BlockmainiaOptions>(Configuration);
             services.AddSyncProvider<CoinProto>("coins");
             services.AddPubSubProvider<CoinProto>(new Core.API.MQTT.NodeEndPoint(brokerSection.GetValue<string>("host"), brokerSection.GetValue<int>("port")));
-            //services.AddMissingBlocksProvider();
             services.AddDbContext();
             services.AddUnitOfWork();
             services.AddOnionServiceClientConfiguration();
@@ -75,11 +74,16 @@ namespace Coin.API
             services.AddSipActorProvider<Startup, CoinProto>();
             services.AddBlockGraphService<CoinProto>();
             services.AddCoinService();
+            services.AddVerifiableFunctionsActorProvider();
+
+            // Fix Additional copy of services
+            services.AddSingleton<IXmlRepository, DataProtectionKeyRepository>();
+            services.AddDataProtection().AddKeyManagementOptions(options => options.XmlRepository = services.BuildServiceProvider().GetService<IXmlRepository>());
         }
 
         /// <summary>
         /// 
-        /// </summary>
+        /// </summary>  
         /// <param name="app"></param>
         /// <param name="lifetime"></param>
         public void Configure(IApplicationBuilder app, IHostApplicationLifetime lifetime)

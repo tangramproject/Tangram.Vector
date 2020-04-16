@@ -2,9 +2,11 @@
 using System.Threading;
 using Akka.Actor;
 using Core.API.Actors.Providers;
+using Core.API.Extentions;
 using Core.API.Model;
 using Core.API.Network;
 using Core.API.Providers;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -113,6 +115,27 @@ namespace Core.API.Extensions
 
                 return sipActorProvider;
 
+            });
+
+            return services;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddVerifiableFunctionsActorProvider(this IServiceCollection services)
+        {
+            services.AddSingleton<IVerifiableFunctionsActorProvider, VerifiableFunctionsActorProvider>(sp =>
+            {
+                var verifiableFunctionsActorProvider = new VerifiableFunctionsActorProvider
+                (
+                    sp.GetService<ActorSystem>(),
+                    sp.GetService<IDataProtectionProvider>()
+                );
+
+                return verifiableFunctionsActorProvider;
             });
 
             return services;

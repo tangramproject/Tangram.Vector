@@ -334,7 +334,7 @@ namespace Core.API.Network
             {
                 var payload = Util.DeserializeProto<PayloadProto>(byteArray);
 
-                var success = await signingActorProvider.VerifiySignature(new VerifiySignatureMessage(payload.Signature, payload.Payload, payload.PublicKey));
+                var success = await signingActorProvider.VerifiySignature(new VerifySignatureMessage(payload.Signature, payload.Payload, payload.PublicKey));
                 if (success)
                 {
                     var identity = Util.DeserializeProto<IdentityProto>(payload.Payload);

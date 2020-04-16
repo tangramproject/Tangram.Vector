@@ -115,7 +115,7 @@ namespace Core.API.Helper
 
         public static BigInteger Mod(BigInteger a, BigInteger n)
         {
-            var result = (a % n);
+            var result = a % n;
             if ((result < 0 && n > 0) || (result > 0 && n < 0))
             {
                 result += n;
@@ -143,10 +143,10 @@ namespace Core.API.Helper
             return c;
         }
 
-        public static BigInteger GetHashNumber(byte[] hash, BigInteger prime, int bytes)
+        public static BigInteger ConvertHashToNumber(byte[] hash, BigInteger prime, int bytes)
         {
             var intH = new BigInteger(hash);
-            var subString = Convert.ToInt32(intH.ToString().Substring(0, bytes));
+            var subString = BigInteger.Parse(intH.ToString().Substring(0, bytes));
             var result = Mod(subString, prime);
 
             return result;
@@ -233,7 +233,7 @@ namespace Core.API.Helper
             return ret;
         }
 
-        public static ulong HashToId(string hash, int xBase)
+        public static ulong HashToId(string hash, int xBase = 5)
         {
             if (hash == null)
                 throw new ArgumentNullException(nameof(hash));
@@ -283,7 +283,6 @@ namespace Core.API.Helper
             }
         }
 
-
         public static BigInteger Exp(BigInteger a, BigInteger exponent, BigInteger n)
         {
             if (exponent < 0)
@@ -316,6 +315,42 @@ namespace Core.API.Helper
             }
 
             return res;
+        }
+
+        public static double ShannonEntropy(string input)
+        {
+            static double logtwo(double num)
+            {
+                return Math.Log(num) / Math.Log(2);
+            }
+
+            static double Contain(string x, char k)
+            {
+                double count = 0;
+                foreach (char Y in x)
+                {
+                    if (Y.Equals(k))
+                        count++;
+                }
+                return count;
+            }
+
+            double infoC = 0;
+            double freq;
+            string k = "";
+            foreach (char c1 in input)
+            {
+                if (!k.Contains(c1.ToString()))
+                    k += c1;
+            }
+            foreach (char c in k)
+            {
+                freq = Contain(input, c) / input.Length;
+                infoC += freq * logtwo(freq);
+            }
+            infoC /= -1;
+
+            return infoC;
         }
 
     }

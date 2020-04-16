@@ -28,6 +28,11 @@ namespace Core.API.ZKP
             prime = BigInteger.Parse(n);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="hash"></param>
+        /// <returns></returns>
         public static Proof GetProof(byte[] hash)
         {
             Prover.hash = hash;
@@ -43,37 +48,62 @@ namespace Core.API.ZKP
             return proof;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="hash"></param>
+        /// <returns></returns>
         public static BigInteger GetHashStringNumber(byte[] hash)
         {
             Prover.hash = hash;
             return X();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="c"></param>
+        /// <returns></returns>
         private static BigInteger R(BigInteger c)
         {
             return BigInteger.Subtract(v, BigInteger.Multiply(c, X()));
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         private static BigInteger T()
         {
             return BigInteger.ModPow(g, v, prime);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         private static BigInteger Y()
         {
             return BigInteger.ModPow(g, X(), prime);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         private static BigInteger X()
         {
-            return Util.GetHashNumber(hash, prime, 8);
+            return Util.ConvertHashToNumber(hash, prime, 8);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         private static BigInteger Heuristic()
         {
             var h = Cryptography.GenericHashNoKey(g.ToString() + Y().ToString() + T().ToString());
             return BitConverter.ToInt32(h, 0) % prime;
         }
-
     }
 }

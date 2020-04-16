@@ -16,6 +16,11 @@ namespace Core.API.ZKP
             g = PickGenerator(prime);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="proof"></param>
+        /// <returns></returns>
         public bool Verify(Proof proof)
         {
             BigInteger result;
@@ -39,11 +44,20 @@ namespace Core.API.ZKP
             return proof.T.Equals(result);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public static BigInteger GetChallenge()
         {
             return new BigInteger(Util.SecureRandom(32).ToByteArray());
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="p"></param>
+        /// <returns></returns>
         public static BigInteger PickGenerator(BigInteger p)
         {
             for (BigInteger i = 1; i < p; i++)
@@ -63,6 +77,12 @@ namespace Core.API.ZKP
             return 0;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="v1"></param>
+        /// <param name="v2"></param>
+        /// <param name="quotient"></param>
         private void BitWise(ref BigInteger v1, ref BigInteger v2, BigInteger quotient)
         {
             var x = BigInteger.Subtract(v2, BigInteger.Multiply(quotient, v1));
@@ -79,6 +99,12 @@ namespace Core.API.ZKP
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private Tuple<BigInteger, BigInteger, BigInteger> ExtendedEuclidean(BigInteger a, BigInteger b)
         {
             var s1 = new BigInteger(0);
@@ -100,6 +126,12 @@ namespace Core.API.ZKP
             return new Tuple<BigInteger, BigInteger, BigInteger>(r2, s2, t2);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="inverN"></param>
+        /// <param name="p"></param>
+        /// <returns></returns>
         private BigInteger Inverse(BigInteger inverN, BigInteger p)
         {
             var gcd = ExtendedEuclidean(inverN, p);

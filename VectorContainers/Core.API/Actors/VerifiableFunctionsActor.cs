@@ -6,6 +6,7 @@ using Akka.Event;
 using Core.API.Extentions;
 using Core.API.LibSodium;
 using Core.API.Messages;
+using Core.API.Model;
 using libsignal.ecc;
 using Microsoft.AspNetCore.DataProtection;
 using Newtonsoft.Json;
@@ -26,7 +27,7 @@ namespace Core.API.Actors
         private readonly ILoggingAdapter logger;
         private readonly IDataProtector dataProtector;
         private readonly string protectedPayload;
-        
+
         public VerifiableFunctionsActor(IDataProtectionProvider dataProtectionProvider)
         {
             logger = Context.GetLogger();
@@ -88,9 +89,25 @@ namespace Core.API.Actors
             var vrfBytes = Curve.verifyVrfSignature(Curve.decodePoint(keyPair.PublicKey.FromHex(), 0), input, proof);
             var difficulty = Difficulty(new VDFDifficultyMessage(vrfBytes, message.MinStake, message.MaxStake));
             var sloth = new Vdf.Sloth();
-            var nonce = sloth.Eval(difficulty, new BigInteger(vrfBytes), BigInteger.Parse(message.Security));
+            var nonce = sloth.Eval(difficulty, new BigInteger(vrfBytes), BigInteger.Parse(message.Security.ToHex()));
             var signature = Sign(new SignedHashMessage(Helper.Util.SerializeProto(message.Model))).ToHex();
-            var headerMessage = new HeaderMessage(difficulty, proof.ToHex(), keyPair.PublicKey, nonce, vrfBytes.ToHex(), Seed, signature, message.BulletProof, message.Model, message.MinStake);
+            var header = new HeaderProto()
+            {
+                BulletProof = message.BulletProof.ToHex(),
+                Difficulty = difficulty,
+                Height = 0,
+                MinStake = message.MinStake,
+                Nonce = nonce,
+                PrevNonce = message.Nonce.ToHex(),
+                Proof = proof.ToHex(),
+                PublicKey = keyPair.PublicKey,
+                Rnd = vrfBytes.ToHex(),
+                Security = message.Security.ToHex(),
+                Seed = message.Seed.ToHex(),
+                Signature = signature,
+                TransactionModel = message.Model
+            };
+            var headerMessage = new HeaderMessage(header);
 
             return headerMessage;
         }
@@ -107,7 +124,7 @@ namespace Core.API.Actors
                 throw new ArgumentNullException(nameof(message));
 
             var sloth = new Vdf.Sloth();
-            return sloth.Verify(message.Header.Difficulty, BigInteger.Parse(message.Header.Proof), BigInteger.Parse(message.Header.Nonce), BigInteger.Parse(message.Security));
+            return sloth.Verify(message.Header.Proto.Difficulty, BigInteger.Parse(message.Header.Proto.Proof), BigInteger.Parse(message.Header.Proto.Nonce), BigInteger.Parse(message.Security));
         }
 
         /// <summary>

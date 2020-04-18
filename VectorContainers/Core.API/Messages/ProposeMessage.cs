@@ -2,19 +2,21 @@
 {
     public class ProposeMessage
     {
-        public string BulletProof { get; }
-        public string Commit { get; }
-        public object Model { get; }
-        public string Seed { get; }
-        public string Security { get; }
+        public byte[] BulletProof { get; }
+        public byte[] Commit { get; }
+        public byte[] Model { get; }
+        public byte[] Nonce { get; }
+        public byte[] Seed { get; }
+        public byte[] Security { get; }
         public int MinStake { get; }
         public int MaxStake { get; } = 1000;
 
-        public ProposeMessage(string bulletProof, string commit, object model, string seed, string security, int minStake)
+        public ProposeMessage(byte[] bulletProof, byte[] commit, byte[] model, byte[] nonce, byte[] seed, byte[] security, int minStake)
         {
             BulletProof = bulletProof;
             Commit = commit;
             Model = model;
+            Nonce = nonce;
             Seed = seed;
             Security = security;
             MinStake = minStake;

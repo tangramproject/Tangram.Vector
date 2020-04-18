@@ -91,10 +91,10 @@ namespace Core.API.Vdf
         {
             var y = ModSqrtOp(t, x, p);
             return y.ToString();
-        }
+        }   
 
         /// <summary>
-        /// 
+        ///     
         /// </summary>
         /// <param name="t"></param>
         /// <param name="x"></param>

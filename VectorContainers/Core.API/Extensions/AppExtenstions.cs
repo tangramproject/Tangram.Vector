@@ -1,9 +1,11 @@
-﻿using Core.API.Actors.Providers;
+﻿using System;
+using Core.API.Actors.Providers;
 using Core.API.Model;
 using Core.API.MQTT;
 using Core.API.Network;
 using Core.API.Providers;
 using Core.API.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -103,6 +105,28 @@ namespace Core.API.Extensions
         public static IServiceCollection AddUnitOfWork(this IServiceCollection services)
         {
             services.AddSingleton<IUnitOfWork, UnitOfWork>();
+            return services;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddDataKeysProtection(this IServiceCollection services)
+        {
+            services.AddSingleton<IDataProtectionKeyRepository, DataProtectionKeyRepository>(sp =>
+            {
+                var dataProtectionKeyRepository = new DataProtectionKeyRepository(sp.GetService<IDbContext>());
+                return dataProtectionKeyRepository;
+            });
+
+            services
+                .AddDataProtection()
+                .AddKeyManagementOptions(options => options.XmlRepository = services.BuildServiceProvider().GetService<IDataProtectionKeyRepository>())
+                .SetApplicationName("tangram")
+                .SetDefaultKeyLifetime(TimeSpan.FromDays(7));
+
             return services;
         }
     }

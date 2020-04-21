@@ -3,20 +3,26 @@ using System.Collections.Generic;
 using System.Xml.Linq;
 using System.Linq;
 using Microsoft.AspNetCore.DataProtection.Repositories;
-using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Core.API.Model
 {
-    public class DataProtectionKeyRepository : IXmlRepository
+    public interface IDataProtectionKeyRepository : IXmlRepository
+    {
+
+    }
+
+    public class DataProtectionKeyRepository : IDataProtectionKeyRepository
     {
         private readonly IDbContext dbContext;
-        private readonly ILogger logger;
+        private readonly ILogger<DataProtectionKeyRepository> logger;
 
-        public DataProtectionKeyRepository(IDbContext dbContext, ILogger logger)
+        public DataProtectionKeyRepository(IDbContext dbContext)
         {
             this.dbContext = dbContext;
-            this.logger = logger;
+            logger = NullLogger<DataProtectionKeyRepository>.Instance;
         }
 
         /// <summary>
@@ -25,12 +31,17 @@ namespace Core.API.Model
         /// <returns></returns>
         public IReadOnlyCollection<XElement> GetAllElements()
         {
-            List<XElement> elements = null;
+            List<XElement> elements = new List<XElement>();
 
             try
             {
                 using var session = dbContext.Document.OpenSession();
-                elements  = session.Query<DataProtectionKeyProto>().Select(k => XElement.Parse(k.XmlData)).ToList();
+
+                var results = session.Query<DataProtectionKeyProto>().Select(k => k.XmlData).ToList();
+                foreach (var item in results)
+                {
+                    elements.Add(XElement.Parse(item));
+                }
             }
             catch (Exception ex)
             {
@@ -38,6 +49,7 @@ namespace Core.API.Model
             }
 
             return new ReadOnlyCollection<XElement>(elements);
+
         }
 
         /// <summary>

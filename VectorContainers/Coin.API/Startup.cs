@@ -59,6 +59,7 @@ namespace Coin.API
             services.AddPubSubProvider<CoinProto>(new Core.API.MQTT.NodeEndPoint(brokerSection.GetValue<string>("host"), brokerSection.GetValue<int>("port")));
             services.AddDbContext();
             services.AddUnitOfWork();
+            services.AddDataKeysProtection();
             services.AddOnionServiceClientConfiguration();
             services.AddOnionServiceClient();
             services.AddHttpClientService(gatewaySection.GetValue<string>("url"));
@@ -75,10 +76,6 @@ namespace Coin.API
             services.AddBlockGraphService<CoinProto>();
             services.AddCoinService();
             services.AddVerifiableFunctionsActorProvider();
-
-            // Fix Additional copy of services
-            services.AddSingleton<IXmlRepository, DataProtectionKeyRepository>();
-            services.AddDataProtection().AddKeyManagementOptions(options => options.XmlRepository = services.BuildServiceProvider().GetService<IXmlRepository>());
         }
 
         /// <summary>

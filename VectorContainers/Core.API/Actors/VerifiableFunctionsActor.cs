@@ -41,19 +41,6 @@ namespace Core.API.Actors
             Receive<VerifyDifficultyMessage>(messag => Sender.Tell(VerifyDifficulty(messag)));
             Receive<SignedHashMessage>(message => Sender.Tell(Sign(message)));
 
-            //var keyPath = Path.Combine(coreDirectory.ToString(), $"{keyFilePurpose}");
-
-            //if (!File.Exists(keyPath))
-            //{
-            //    protectedPayload = dataProtector.Protect(Newtonsoft.Json.JsonConvert.SerializeObject(CreateKeyPair()));
-            //    SaveFile(keyPath, protectedPayload);
-
-            //    return;
-            //}
-
-            //protectedPayload = File.ReadAllText(keyPath);
-
-
             protectedPayload = dataProtector.Protect(JsonConvert.SerializeObject(CreateKeyPair()));
         }
 
@@ -95,12 +82,13 @@ namespace Core.API.Actors
             {
                 BulletProof = message.BulletProof.ToHex(),
                 Difficulty = difficulty,
-                Height = 0,
+                Height = message.Height,
                 MinStake = message.MinStake,
                 Nonce = nonce,
                 PrevNonce = message.Nonce.ToHex(),
                 Proof = proof.ToHex(),
                 PublicKey = keyPair.PublicKey,
+                Reward = 0,
                 Rnd = vrfBytes.ToHex(),
                 Security = message.Security.ToHex(),
                 Seed = message.Seed.ToHex(),
@@ -198,6 +186,17 @@ namespace Core.API.Actors
             var keyPairMessage = new KeyPairMessage(keys.getPrivateKey().serialize().ToHex(), keys.getPublicKey().serialize().ToHex());
 
             return keyPairMessage;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="difficulty"></param>
+        /// <param name="height"></param>
+        /// <returns></returns>
+        private ulong RewardBlock(int difficulty, long height)
+        {
+            return 1;
         }
 
         /// <summary>

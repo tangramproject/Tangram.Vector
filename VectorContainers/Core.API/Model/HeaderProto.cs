@@ -24,14 +24,16 @@ namespace Core.API.Model
         [ProtoMember(8)]
         public string PublicKey { get; set; }
         [ProtoMember(9)]
-        public string Rnd { get; set; }
+        public ulong Reward { get; set; }
         [ProtoMember(10)]
-        public string Seed { get; set; }
+        public string Rnd { get; set; }
         [ProtoMember(11)]
-        public string Security { get; set; }
+        public string Seed { get; set; }
         [ProtoMember(12)]
-        public string Signature { get; set; }
+        public string Security { get; set; }
         [ProtoMember(13)]
+        public string Signature { get; set; }
+        [ProtoMember(14)]
         public object TransactionModel { get; set; }
     }
 }

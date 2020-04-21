@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
 using MQTTnet.Client.Options;
 using MQTTnet.Extensions.ManagedClient;
 using MQTTnet.Protocol;
 using Serilog;
-using Serilog.Events;
 
 namespace Core.API.MQTT
 {
@@ -18,6 +19,7 @@ namespace Core.API.MQTT
         private readonly int port;
         private readonly string topic;
         private readonly IManagedMqttClient client;
+        private readonly ILogger<Subscriber> logger;
 
         public Subscriber(ulong id, string host, int port, string topic)
         {
@@ -26,18 +28,12 @@ namespace Core.API.MQTT
             this.port = port;
             this.topic = topic;
 
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-                .Enrich.FromLogContext()
-                .WriteTo.File("MQTT.Subscriber.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 2)
-                .CreateLogger();
-
+            logger = NullLogger<Subscriber>.Instance;
             client = new MqttFactory().CreateManagedMqttClient();
 
             client.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(e =>
             {
-                Log.Error($"<<< Subscriber >>>: Connecting failed! {e.Exception.ToString()}");
+                Log.Error($"<<< Subscriber >>>: Connecting failed! {e.Exception}");
             });
         }
 
@@ -79,7 +75,7 @@ namespace Core.API.MQTT
         {
             if (MqttApplicationMessageReceived == null)
             {
-                Log.Warning("<<< Subscriber.OnMqttApplicationMessageReceived >>>: Mqtt messages will not be received. Event handler delegate not defined.");
+                logger.LogWarning("<<< Subscriber.OnMqttApplicationMessageReceived >>>: Mqtt messages will not be received. Event handler delegate not defined.");
             }
 
             MqttApplicationMessageReceived?.Invoke(this, args);

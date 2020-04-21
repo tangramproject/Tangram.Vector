@@ -20,8 +20,6 @@ namespace Core.API.Actors
         public const string Seed = "6b341e59ba355e73b1a8488e75b617fe1caa120aa3b56584a217862840c4f7b5d70cefc0d2b36038d67a35b3cd406d54f8065c1371a17a44c1abb38eea8883b2";
         public const string Security256 = "60464814417085833675395020742168312237934553084050601624605007846337253615407";
 
-        private static readonly DirectoryInfo coreDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-
         private const string keyFilePurpose = "VerifiableFunctionsActor.Key";
 
         private readonly ILoggingAdapter logger;

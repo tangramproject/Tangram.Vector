@@ -7,12 +7,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Core.API.Services
 {
-    public class PubSubService<TAttach> : BackgroundService
+    public class PubSubBlockGraphService<TAttach> : BackgroundService
     {
-        private readonly PubSubProvider<TAttach>  pubSubProvider;
+        private readonly PubSubBlockGraphProvider<TAttach>  pubSubProvider;
         private readonly ILogger logger;
 
-        public PubSubService(PubSubProvider<TAttach> pubSubProvider, ILogger<PubSubProvider<TAttach>> logger)
+        public PubSubBlockGraphService(PubSubBlockGraphProvider<TAttach> pubSubProvider, ILogger<PubSubBlockGraphProvider<TAttach>> logger)
         {
             this.pubSubProvider = pubSubProvider;
             this.logger = logger;
@@ -41,7 +41,7 @@ namespace Core.API.Services
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubService >>>: {ex.ToString()}");
+                logger.LogError($"<<< PubSubBlockGraphService >>>: {ex}");
             }
 
         }

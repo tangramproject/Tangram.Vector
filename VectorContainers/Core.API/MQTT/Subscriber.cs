@@ -70,6 +70,17 @@ namespace Core.API.MQTT
         /// <summary>
         /// 
         /// </summary>
+        /// <returns></returns>
+        public async Task<bool> Stop()
+        {
+            await client.StopAsync();
+
+            return client.IsStarted;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="args"></param>
         protected virtual void OnMqttApplicationMessageReceived(MqttApplicationMessageReceivedEventArgs args)
         {

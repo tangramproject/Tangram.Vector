@@ -19,21 +19,21 @@ namespace Core.API.Extensions
         /// <typeparam name="TAttach"></typeparam>
         /// <param name="services"></param>
         /// <returns></returns>
-        public static IServiceCollection AddPubSubProvider<TAttach>(this IServiceCollection services, NodeEndPoint nodeEndPoint)
+        public static IServiceCollection AddPubSubBlockGraphProvider<TAttach>(this IServiceCollection services, NodeEndPoint nodeEndPoint)
         {
             services.AddSingleton(sp =>
             {
-                var pubSubProvider = new PubSubProvider<TAttach>(
+                var pubSubProvider = new PubSubBlockGraphProvider<TAttach>(
                     sp.GetService<IUnitOfWork>(),
                     sp.GetService<IHttpClientService>(),
                     sp.GetService<IBlockGraphService<TAttach>>(),
-                    sp.GetService<ILogger<PubSubProvider<TAttach>>>(),
+                    sp.GetService<ILogger<PubSubBlockGraphProvider<TAttach>>>(),
                     nodeEndPoint
                 );
 
                 return pubSubProvider;
             });
-            services.AddHostedService<PubSubService<TAttach>>();
+            services.AddHostedService<PubSubBlockGraphService<TAttach>>();
             return services;
         }
 

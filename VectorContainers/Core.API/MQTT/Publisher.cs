@@ -67,6 +67,17 @@ namespace Core.API.MQTT
         /// <summary>
         /// 
         /// </summary>
+        /// <returns></returns>
+        public async Task<bool> Stop()
+        {
+            await client.StopAsync();
+
+            return client.IsStarted;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="topic"></param>
         /// <param name="payload"></param>
         public async Task<MqttClientPublishResult> Publish(string topic, byte[] payload)

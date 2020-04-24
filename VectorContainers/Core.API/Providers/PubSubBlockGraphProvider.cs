@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Core.API.Providers
 {
-    public class PubSubProvider<TAttach>
+    public class PubSubBlockGraphProvider<TAttach>
     {
         private static readonly AsyncLock markStatesAsMutex = new AsyncLock();
         private static readonly AsyncLock markRepliesAsMutex = new AsyncLock();
@@ -32,8 +32,8 @@ namespace Core.API.Providers
 
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
-        public PubSubProvider(IUnitOfWork unitOfWork, IHttpClientService httpClientService, IBlockGraphService<TAttach> blockGraphService,
-            ILogger<PubSubProvider<TAttach>> logger, NodeEndPoint nodeEndPoint)
+        public PubSubBlockGraphProvider(IUnitOfWork unitOfWork, IHttpClientService httpClientService, IBlockGraphService<TAttach> blockGraphService,
+            ILogger<PubSubBlockGraphProvider<TAttach>> logger, NodeEndPoint nodeEndPoint)
         {
             this.unitOfWork = unitOfWork;
             this.httpClientService = httpClientService;
@@ -62,7 +62,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.Start >>>: {ex}");
+                logger.LogError($"<<< PubSubBlockGraphProvider.Start >>>: {ex}");
             }
         }
 
@@ -121,7 +121,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.Publish >>>: {ex}");
+                logger.LogError($"<<< PubSubBlockGraphProvider.Publish >>>: {ex}");
             }
             finally
             {
@@ -129,6 +129,7 @@ namespace Core.API.Providers
             }
         }
 
+        //TODO: Move over to JobActor.
         /// <summary>
         /// 
         /// </summary>
@@ -172,7 +173,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.MarkMultipleStatesAs >>>: {ex}");
+                logger.LogError($"<<< PubSubBlockGraphProvider.MarkMultipleStatesAs >>>: {ex}");
             }
 
             return;
@@ -210,7 +211,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.MarkMultipleRepliesAs >>>: {ex}");
+                logger.LogError($"<<< PubSubBlockGraphProvider.MarkMultipleRepliesAs >>>: {ex}");
             }
 
             return;
@@ -235,7 +236,7 @@ namespace Core.API.Providers
                         var added = await blockGraphService.SetBlockGraph(blockGraphProtos.ElementAt(i));
                         if (added != null)
                         {
-                            logger.LogError($"<<< PubSubProvider.Subscriber_MqttApplicationMessageReceived >>>: " +
+                            logger.LogError($"<<< PubSubBlockGraphProvider.Subscriber_MqttApplicationMessageReceived >>>: " +
                                 $"Blockgraph: {blockGraphProtos.ElementAt(i).Block.Hash} was not add " +
                                 $"for node {blockGraphProtos.ElementAt(i).Block.Node} and round {blockGraphProtos.ElementAt(i).Block.Round}");
                         }
@@ -244,7 +245,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.Subscriber_MqttApplicationMessageReceived >>>: {ex}");
+                logger.LogError($"<<< PubSubBlockGraphProvider.Subscriber_MqttApplicationMessageReceived >>>: {ex}");
             }
         }
 

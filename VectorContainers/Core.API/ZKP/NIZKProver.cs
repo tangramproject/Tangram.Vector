@@ -13,20 +13,17 @@ namespace Core.API.ZKP
         public BigInteger Y { get; set; }
     }
 
-    public static class Prover
+    public static class NIZKProver
     {
         public const string n = "304725736006641064630309168029524485973";
 
         private static readonly BigInteger prime;
+        private static readonly BigInteger g = 2;
 
         private static byte[] hash;
-        private static BigInteger g = 2;
         private static BigInteger v;
 
-        static Prover()
-        {
-            prime = BigInteger.Parse(n);
-        }
+        static NIZKProver() => prime = BigInteger.Parse(n);
 
         /// <summary>
         /// 
@@ -35,7 +32,7 @@ namespace Core.API.ZKP
         /// <returns></returns>
         public static Proof GetProof(byte[] hash)
         {
-            Prover.hash = hash;
+            NIZKProver.hash = hash;
             v = BigInteger.Abs(new BigInteger(Cryptography.RandomBytes(16)));
 
             var c = BigInteger.Abs(Heuristic());
@@ -55,7 +52,7 @@ namespace Core.API.ZKP
         /// <returns></returns>
         public static BigInteger GetHashStringNumber(byte[] hash)
         {
-            Prover.hash = hash;
+            NIZKProver.hash = hash;
             return X();
         }
 

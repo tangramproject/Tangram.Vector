@@ -4,13 +4,13 @@ using Core.API.Helper;
 
 namespace Core.API.ZKP
 {
-    public class Verifier : IVerifier
+    public class NIZKVerifier
     {
         public const string n = "304725736006641064630309168029524485973";
         private readonly BigInteger prime;
         private readonly BigInteger g = 2;
 
-        public Verifier()
+        public NIZKVerifier()
         {
             prime = BigInteger.Parse(n);
             g = PickGenerator(prime);

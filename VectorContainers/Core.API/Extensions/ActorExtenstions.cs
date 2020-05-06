@@ -5,7 +5,6 @@ using Core.API.Actors.Providers;
 using Core.API.Model;
 using Core.API.Network;
 using Core.API.Providers;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -131,7 +130,7 @@ namespace Core.API.Extensions
                 var verifiableFunctionsActorProvider = new VerifiableFunctionsActorProvider
                 (
                     sp.GetService<ActorSystem>(),
-                    sp.GetService<IDataProtectionProvider>()
+                    sp.GetService<ISigningActorProvider>()
                 );
 
                 return verifiableFunctionsActorProvider;

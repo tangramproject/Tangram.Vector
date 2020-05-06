@@ -1,15 +1,14 @@
 ﻿using System;
-using System.IO;
 using System.Numerics;
+using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Event;
+using Core.API.Actors.Providers;
 using Core.API.Extentions;
 using Core.API.LibSodium;
 using Core.API.Messages;
 using Core.API.Model;
 using libsignal.ecc;
-using Microsoft.AspNetCore.DataProtection;
-using Newtonsoft.Json;
 
 namespace Core.API.Actors
 {
@@ -20,42 +19,20 @@ namespace Core.API.Actors
         public const string Seed = "6b341e59ba355e73b1a8488e75b617fe1caa120aa3b56584a217862840c4f7b5d70cefc0d2b36038d67a35b3cd406d54f8065c1371a17a44c1abb38eea8883b2";
         public const string Security256 = "60464814417085833675395020742168312237934553084050601624605007846337253615407";
 
-        private const string keyFilePurpose = "VerifiableFunctionsActor.Key";
+        private const string keyPurpose = "VerifiableFunctionsActor.Key";
 
         private readonly ILoggingAdapter logger;
-        private readonly IDataProtector dataProtector;
-        private readonly string protectedPayload;
+        private readonly ISigningActorProvider signingActorProvider;
 
-        public VerifiableFunctionsActor(IDataProtectionProvider dataProtectionProvider)
+        public VerifiableFunctionsActor(ISigningActorProvider signingActorProvider)
         {
             logger = Context.GetLogger();
-            dataProtector = dataProtectionProvider.CreateProtector(keyFilePurpose);
+            this.signingActorProvider = signingActorProvider;
 
-            Receive<KeyPairMessage>(message => Sender.Tell(GetKeyPair()));
-            Receive<ProposeMessage>(message => Sender.Tell(ProposeNewBlock(message)));
+            ReceiveAsync<ProposeMessage>(async message => Sender.Tell(await ProposeNewBlock(message)));
             Receive<VDFDifficultyMessage>(message => Sender.Tell(Difficulty(message)));
-            Receive<VerifySignatureMessage>(message => Sender.Tell(VeriySignature(message)));
             Receive<VeifyVDFMessage>(messag => Sender.Tell(VerifyVDF(messag)));
             Receive<VerifyDifficultyMessage>(messag => Sender.Tell(VerifyDifficulty(messag)));
-            Receive<SignedHashMessage>(message => Sender.Tell(Sign(message)));
-
-            protectedPayload = dataProtector.Protect(JsonConvert.SerializeObject(CreateKeyPair()));
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public KeyPairMessage GetKeyPair()
-        {
-            if (string.IsNullOrEmpty(protectedPayload))
-                throw new ArgumentException("Protected payload is not set.", nameof(protectedPayload));
-
-            var unprotectedPayload = dataProtector.Unprotect(protectedPayload);
-            var definition = new { SecretKey = "", PublicKey = "" };
-            var message = JsonConvert.DeserializeAnonymousType(unprotectedPayload, definition);
-
-            return new KeyPairMessage(message.SecretKey, message.PublicKey);
         }
 
         /// <summary>
@@ -63,19 +40,19 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        public HeaderMessage ProposeNewBlock(ProposeMessage message)
+        public async Task<HeaderMessage> ProposeNewBlock(ProposeMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            var keyPair = GetKeyPair();
+            var keyPairMessage = await signingActorProvider.CreateKeyPurpose(new KeyPurposeMessage(keyPurpose));
             var input = Cryptography.GenericHashNoKey($"{message.Commit} {message.BulletProof} {message.Seed} {message.Security} {message.MinStake}");
-            var proof = Curve.calculateVrfSignature(Curve.decodePrivatePoint(keyPair.SecretKey.FromHex()), input);
-            var vrfBytes = Curve.verifyVrfSignature(Curve.decodePoint(keyPair.PublicKey.FromHex(), 0), input, proof);
+            var proof = Curve.calculateVrfSignature(Curve.decodePrivatePoint(keyPairMessage.SecretKey.FromHex()), input);
+            var vrfBytes = Curve.verifyVrfSignature(Curve.decodePoint(keyPairMessage.PublicKey.FromHex(), 0), input, proof);
             var difficulty = Difficulty(new VDFDifficultyMessage(vrfBytes, message.MinStake, message.MaxStake));
             var sloth = new Vdf.Sloth();
             var nonce = sloth.Eval(difficulty, new BigInteger(vrfBytes), BigInteger.Parse(message.Security.ToHex()));
-            var signature = Sign(new SignedHashMessage(Helper.Util.SerializeProto(message.Model))).ToHex();
+            var signedHashResponse = await signingActorProvider.Sign(new SignedHashMessage(Helper.Util.SerializeProto(message.Model)));
             var header = new HeaderProto()
             {
                 BulletProof = message.BulletProof.ToHex(),
@@ -85,12 +62,12 @@ namespace Core.API.Actors
                 Nonce = nonce,
                 PrevNonce = message.Nonce.ToHex(),
                 Proof = proof.ToHex(),
-                PublicKey = keyPair.PublicKey,
+                PublicKey = signedHashResponse.PublicKey.ToHex(),
                 Reward = 0,
                 Rnd = vrfBytes.ToHex(),
                 Security = message.Security.ToHex(),
                 Seed = message.Seed.ToHex(),
-                Signature = signature,
+                Signature = signedHashResponse.Signature.ToHex(),
                 TransactionModel = message.Model
             };
             var headerMessage = new HeaderMessage(header);
@@ -104,7 +81,7 @@ namespace Core.API.Actors
         /// <param name="header"></param>
         /// <param name="security"></param>
         /// <returns></returns>
-        public bool VerifyVDF(VeifyVDFMessage message)
+        private bool VerifyVDF(VeifyVDFMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -118,23 +95,7 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        public byte[] Sign(SignedHashMessage message)
-        {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
-
-            var keyPair = GetKeyPair();
-            var signedHash = Curve.calculateSignature(Curve.decodePrivatePoint(keyPair.SecretKey.FromHex()), message.Hash);
-
-            return signedHash;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns></returns>
-        public int Difficulty(VDFDifficultyMessage message)
+        private int Difficulty(VDFDifficultyMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -152,38 +113,13 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        public bool VeriySignature(VerifySignatureMessage message)
-        {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
-
-            return Curve.verifySignature(Curve.decodePoint(message.PublicKey, 0), message.Message, message.Signature);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns></returns>
-        public bool VerifyDifficulty(VerifyDifficultyMessage message)
+        private bool VerifyDifficulty(VerifyDifficultyMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
             var difficulty = Difficulty(new VDFDifficultyMessage(message.VrfBytes, message.MinStake, message.MaxStake));
             return difficulty == message.Difficulty;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        private KeyPairMessage CreateKeyPair()
-        {
-            var keys = Curve.generateKeyPair();
-            var keyPairMessage = new KeyPairMessage(keys.getPrivateKey().serialize().ToHex(), keys.getPublicKey().serialize().ToHex());
-
-            return keyPairMessage;
         }
 
         /// <summary>
@@ -200,27 +136,8 @@ namespace Core.API.Actors
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="path"></param>
-        /// <param name="content"></param>
-        private void SaveFile(string path, string content)
-        {
-            try
-            {
-                using StreamWriter outputFile = new StreamWriter(path);
-                outputFile.WriteLine(content);
-            }
-            catch (Exception ex)
-            {
-                logger.Error(ex.Message);
-                throw new Exception(ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
         /// <returns></returns>
-        public static Props Create(IDataProtectionProvider dataProtectionProvider) =>
-            Props.Create(() => new VerifiableFunctionsActor(dataProtectionProvider));
+        public static Props Create(ISigningActorProvider signingActorProvider) =>
+            Props.Create(() => new VerifiableFunctionsActor(signingActorProvider));
     }
 }

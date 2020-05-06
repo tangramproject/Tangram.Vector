@@ -15,5 +15,7 @@ namespace Core.API.Model
         Task<TEntity> GetFirstOrDefault(Expression<Func<TEntity, bool>> expression);
         Task<TEntity> GetLast(Expression<Func<TEntity, bool>> expression);
         Task<TEntity> GetLast();
+        Task<IEnumerable<TEntity>> TakeLast(int n);
+        Task<IEnumerable<TEntity>> GetRange(int skip, int take);
     }
 }

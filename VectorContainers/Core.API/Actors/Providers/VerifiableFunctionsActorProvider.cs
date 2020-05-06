@@ -14,9 +14,9 @@ namespace Core.API.Actors.Providers
             actor = actorSystem.ActorOf(props, "vf-actor");
         }
 
-        public VerifiableFunctionsActorProvider(ActorSystem actorSystem, IDataProtectionProvider dataProtectionProvider)
+        public VerifiableFunctionsActorProvider(ActorSystem actorSystem, ISigningActorProvider signingActorProvider)
         {
-            var actorProps = VerifiableFunctionsActor.Create(dataProtectionProvider);
+            var actorProps = VerifiableFunctionsActor.Create(signingActorProvider);
             actor = actorSystem.ActorOf(actorProps, "vf-actor");
         }
 

@@ -2,29 +2,98 @@
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Event;
+using Core.API.Extentions;
 using Core.API.Helper;
 using Core.API.Messages;
-using Core.API.Onion;
-using Core.API.Signatures;
+using Core.API.Model;
+using libsignal.ecc;
+using Microsoft.AspNetCore.DataProtection;
+using Newtonsoft.Json;
 
 namespace Core.API.Actors
 {
     public class SigningActor : ReceiveActor
     {
-        private readonly IOnionServiceClient onionServiceClient;
+        private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly ILoggingAdapter logger;
+        private readonly IUnitOfWork unitOfWork;
 
-        public SigningActor(IOnionServiceClient onionServiceClient)
+        private IDataProtector dataProtector;
+        private DataProtectionPayloadProto protectionPayloadProto;
+
+        public SigningActor(IDataProtectionProvider dataProtectionProvider, IUnitOfWork unitOfWork)
         {
-            this.onionServiceClient = onionServiceClient;
+            this.dataProtectionProvider = dataProtectionProvider;
+            this.unitOfWork = unitOfWork;
 
             logger = Context.GetLogger();
 
+            ReceiveAsync<KeyPurposeMessage>(async message => Sender.Tell(await CreateKeyPurpose(message)));
+            Receive<SignedHashMessage>(message => Sender.Tell(Sign(message)));
+            Receive<SignedBlockMessage>(message => Sender.Tell(Sign(message)));
             Receive<VerifySignatureMessage>(message => Sender.Tell(VerifiySignature(message)));
+        }
 
-            ReceiveAsync<SignedHashMessage>(async message => Sender.Tell(await Sign(message)));
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private KeyPairMessage GetKeyPair()
+        {
+            if (protectionPayloadProto == null)
+                throw new NullReferenceException("ProtectionPayloadProto cannot be null");
 
-            ReceiveAsync<SignedBlockMessage>(async message => Sender.Tell(await Sign(message)));
+            if (string.IsNullOrEmpty(protectionPayloadProto.Payload))
+                throw new ArgumentException("Protected payload is not set.", nameof(protectionPayloadProto.Payload));
+
+            var unprotectedPayload = dataProtector.Unprotect(protectionPayloadProto.Payload);
+            var definition = new { SecretKey = "", PublicKey = "" };
+            var message = JsonConvert.DeserializeAnonymousType(unprotectedPayload, definition);
+
+            return new KeyPairMessage(message.SecretKey, message.PublicKey);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="purpose"></param>
+        /// <returns></returns>
+        private async Task<KeyPairMessage> CreateKeyPurpose(KeyPurposeMessage message)
+        {
+            try
+            {
+                dataProtector = dataProtectionProvider.CreateProtector(message.Purpose);
+                protectionPayloadProto = await unitOfWork.DataProtectionPayload.GetFirstOrDefault(x => x.FriendlyName == message.Purpose);
+
+                if (protectionPayloadProto == null)
+                {
+                    protectionPayloadProto = new DataProtectionPayloadProto
+                    {
+                        FriendlyName = message.Purpose,
+                        Payload = dataProtector.Protect(JsonConvert.SerializeObject(CreateKeyPair()))
+                    };
+                }
+
+                return GetKeyPair();
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"<<< SigningActor.CreateKeyPurpose >>>: {ex}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private KeyPairMessage CreateKeyPair()
+        {
+            var keys = Curve.generateKeyPair();
+            var keyPairMessage = new KeyPairMessage(keys.getPrivateKey().serialize().ToHex(), keys.getPublicKey().serialize().ToHex());
+
+            return keyPairMessage;
         }
 
         /// <summary>
@@ -32,7 +101,7 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        private async Task<Models.SignedHashResponse> Sign(SignedBlockMessage message)
+        private Models.SignedHashResponse Sign(SignedBlockMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -45,14 +114,19 @@ namespace Core.API.Actors
 
             try
             {
+                var keyPair = GetKeyPair();
                 var byteArray = Util.SerializeProto(message.Model);
-                var signedHashResponse = await onionServiceClient.SignHashAsync(byteArray);
+                var signedHashResponse = new Models.SignedHashResponse
+                {
+                    PublicKey = keyPair.PublicKey.FromHex(),
+                    Signature = Curve.calculateSignature(Curve.decodePrivatePoint(keyPair.SecretKey.FromHex()), byteArray)
+                };
 
                 return signedHashResponse;
             }
             catch (Exception ex)
             {
-                logger.Error($"<<< SigningActor.Sign >>>: {ex.ToString()}");
+                logger.Error($"<<< SigningActor.Sign >>>: {ex}");
             }
 
             return null;
@@ -63,7 +137,7 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        private async Task<Models.SignedHashResponse> Sign(SignedHashMessage message)
+        private Models.SignedHashResponse Sign(SignedHashMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -71,7 +145,23 @@ namespace Core.API.Actors
             if (message.Hash == null)
                 throw new ArgumentNullException(nameof(message.Hash));
 
-            return await onionServiceClient.SignHashAsync(message.Hash);
+            try
+            {
+                var keyPair = GetKeyPair();
+                var signedHashResponse = new Models.SignedHashResponse
+                {
+                    PublicKey = keyPair.PublicKey.FromHex(),
+                    Signature = Curve.calculateSignature(Curve.decodePrivatePoint(keyPair.SecretKey.FromHex()), message.Hash)
+                };
+
+                return signedHashResponse;
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"<<< SigningActor.Sign >>>: {ex}");
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -100,11 +190,12 @@ namespace Core.API.Actors
 
             try
             {
-                result = Ed25519.Verify(message.Signature, message.Message, message.PublicKey);
+                var keyPair = GetKeyPair();
+                result = Curve.verifySignature(Curve.decodePoint(keyPair.PublicKey.FromHex(), 0), message.Message, message.Signature);
             }
             catch (Exception ex)
             {
-                logger.Error($"<<< SigningActor.VerifiySignature >>>: {ex.ToString()}");
+                logger.Error($"<<< SigningActor.VerifiySignature >>>: {ex}");
             }
 
             return result;
@@ -115,8 +206,8 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="onionServiceClient"></param>
         /// <returns></returns>
-        public static Props Create(IOnionServiceClient onionServiceClient) =>
-            Props.Create(() => new SigningActor(onionServiceClient));
+        public static Props Create(IDataProtectionProvider dataProtectionProvider, IUnitOfWork unitOfWork) =>
+            Props.Create(() => new SigningActor(dataProtectionProvider, unitOfWork));
 
     }
 }

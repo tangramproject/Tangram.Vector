@@ -213,5 +213,52 @@ namespace Core.API.Model
 
             return Task.FromResult(entities);
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="skip"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
+        public Task<IEnumerable<TEntity>> GetRange(int skip, int take)
+        {
+            var entities = Enumerable.Empty<TEntity>();
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+                entities = session.Query<TEntity>().Skip(skip).Take(take);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Repository.GetRange >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(entities);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="n"></param>
+        /// <returns></returns>
+        public Task<IEnumerable<TEntity>> TakeLast(int n)
+        {
+            var entities = Enumerable.Empty<TEntity>();
+
+            try
+            {
+                using var session = dbContext.Document.OpenSession();
+                var count = session.Query<TEntity>().Count();
+
+                entities = session.Query<TEntity>().Skip(Math.Max(0, count - n));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"<<< Repository.GetRange >>>: {ex.ToString()}");
+            }
+
+            return Task.FromResult(entities);
+        }
     }
 }

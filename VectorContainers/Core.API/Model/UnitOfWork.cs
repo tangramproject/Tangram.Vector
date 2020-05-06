@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.AspNetCore.DataProtection.Repositories;
+using Microsoft.Extensions.Logging;
 using Raven.Client.Documents;
 
 namespace Core.API.Model
@@ -10,6 +11,8 @@ namespace Core.API.Model
 
         public IMessageRepository Message { get; private set; }
         public IDocumentStore Document { get; }
+        public IXmlRepository DataProtectionKeys { get; }
+        public IDataProtectionPayloadReposittory DataProtectionPayload { get; private set; }
 
         public UnitOfWork(IDbContext dbContext, ILogger<UnitOfWork> logger)
         {
@@ -18,6 +21,8 @@ namespace Core.API.Model
 
             Document = dbContext.Document;
             Message = new MessageRepository(dbContext, logger);
+            DataProtectionKeys = new DataProtectionKeyRepository(dbContext);
+            DataProtectionPayload = new DataProtectionPayloadReposittory(dbContext, logger);
         }
 
         /// <summary>

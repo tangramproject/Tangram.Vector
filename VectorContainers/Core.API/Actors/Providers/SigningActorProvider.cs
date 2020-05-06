@@ -2,8 +2,9 @@
 using Akka.Actor;
 using Akka.Routing;
 using Core.API.Messages;
+using Core.API.Model;
 using Core.API.Models;
-using Core.API.Onion;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Core.API.Actors.Providers
 {
@@ -16,12 +17,22 @@ namespace Core.API.Actors.Providers
             actor = actorSystem.ActorOf(props, "signing-actor");
         }
 
-        public SigningActorProvider(ActorSystem actorSystem, IOnionServiceClient onionServiceClient)
+        public SigningActorProvider(ActorSystem actorSystem, IDataProtectionProvider dataProtectionProvider, IUnitOfWork unitOfWork)
         {
-            var actorProps = SigningActor.Create(onionServiceClient).WithRouter(new RoundRobinPool(5));
+            var actorProps = SigningActor.Create(dataProtectionProvider, unitOfWork).WithRouter(new RoundRobinPool(5));
             actor = actorSystem.ActorOf(actorProps, "signing-actor");
         }
-        
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public async Task<KeyPairMessage> CreateKeyPurpose(KeyPurposeMessage message)
+        {
+            return await actor.Ask<KeyPairMessage>(message);
+        }
+
         /// <summary>
         /// 
         /// </summary>

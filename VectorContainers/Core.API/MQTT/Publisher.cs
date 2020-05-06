@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
 using MQTTnet.Client.Options;
 using MQTTnet.Client.Publishing;
 using MQTTnet.Extensions.ManagedClient;
 using Serilog;
-using Serilog.Events;
 
 namespace Core.API.MQTT
 {
@@ -17,6 +18,7 @@ namespace Core.API.MQTT
         private readonly int port;
         private readonly IManagedMqttClient client;
         private readonly ClientStorageManager clientStorageManager;
+        private readonly ILogger<Publisher> logger;
 
         public Publisher(ulong id, string host, int port)
         {
@@ -24,18 +26,12 @@ namespace Core.API.MQTT
             this.host = host;
             this.port = port;
 
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-                .Enrich.FromLogContext()
-                .WriteTo.File("MQTT.Publisher.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 2)
-                .CreateLogger();
-
+            logger = NullLogger<Publisher>.Instance;
             client = new MqttFactory().CreateManagedMqttClient();
 
             client.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(e =>
             {
-                Log.Error($"<<< Publisher >>>: Connecting failed! {e.Exception.ToString()}");
+                Log.Error($"<<< Publisher >>>: Connecting failed! {e.Exception}");
             });
 
             clientStorageManager = new ClientStorageManager();
@@ -89,7 +85,7 @@ namespace Core.API.MQTT
             }
             catch (Exception ex)
             {
-                Log.Error($"<<< Publisher.Publish >>>: {ex.ToString()}");
+                logger.LogError($"<<< Publisher.Publish >>>: {ex}");
             }
 
             return result;

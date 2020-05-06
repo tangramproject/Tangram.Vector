@@ -32,12 +32,12 @@ namespace Core.API.Providers
 
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
-        public PubSubProvider(IUnitOfWork unitOfWork, IHttpClientService httpClientService, IBlockGraphService<TAttach> blockGraphSerivce,
+        public PubSubProvider(IUnitOfWork unitOfWork, IHttpClientService httpClientService, IBlockGraphService<TAttach> blockGraphService,
             ILogger<PubSubProvider<TAttach>> logger, NodeEndPoint nodeEndPoint)
         {
             this.unitOfWork = unitOfWork;
             this.httpClientService = httpClientService;
-            this.blockGraphService = blockGraphSerivce;
+            this.blockGraphService = blockGraphService;
             this.logger = logger;
 
             baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
@@ -62,7 +62,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.Start >>>: {ex.ToString()}");
+                logger.LogError($"<<< PubSubProvider.Start >>>: {ex}");
             }
         }
 
@@ -121,7 +121,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.Publish >>>: {ex.ToString()}");
+                logger.LogError($"<<< PubSubProvider.Publish >>>: {ex}");
             }
             finally
             {
@@ -172,7 +172,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.MarkMultipleStatesAs >>>: {ex.ToString()}");
+                logger.LogError($"<<< PubSubProvider.MarkMultipleStatesAs >>>: {ex}");
             }
 
             return;
@@ -210,7 +210,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.MarkMultipleRepliesAs >>>: {ex.ToString()}");
+                logger.LogError($"<<< PubSubProvider.MarkMultipleRepliesAs >>>: {ex}");
             }
 
             return;
@@ -244,7 +244,7 @@ namespace Core.API.Providers
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< PubSubProvider.Subscriber_MqttApplicationMessageReceived >>>: {ex.ToString()}");
+                logger.LogError($"<<< PubSubProvider.Subscriber_MqttApplicationMessageReceived >>>: {ex}");
             }
         }
 

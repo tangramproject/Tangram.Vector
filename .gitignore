@@ -54,3 +54,4 @@ bld/
 *.sln.docstates
 *.log
 *.db
+RetainedMessages.json

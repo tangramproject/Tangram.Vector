@@ -30,26 +30,34 @@ namespace Membership.API
 
         IPAddress GetPublicHostIp(string serviceUrl = "https://ipv4.icanhazip.com/")
         {
-            string ip = null;
             var membershipSection = Configuration.GetSection("membership");
             var publicAddressSection = membershipSection.GetSection("PublicHost");
 
+            string ip;
             if (publicAddressSection.Exists())
                 ip = publicAddressSection.Value;
             else
                 ip = new WebClient()
                     .DownloadString(serviceUrl)
                     .Trim();
+            try
+            {
+                IPAddress.Parse(ip);
+            }
+            catch (Exception)
+            {
+                return IPAddress.Parse("127.0.0.1");
+            }
 
             return IPAddress.Parse(ip);
         }
 
         private string GetPublicHostPort()
         {
-            string port = null;
             var membershipSection = Configuration.GetSection("membership");
             var publicPortSection = membershipSection.GetSection("PublicPort");
 
+            string port;
             if (publicPortSection.Exists())
                 port = publicPortSection.Value;
             else

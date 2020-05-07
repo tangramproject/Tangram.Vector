@@ -14,6 +14,7 @@ using Core.API.Middlewares;
 using Core.API.Actors.Providers;
 using Core.API.Extensions;
 using Coin.API.Model;
+using Core.API.ZKP;
 
 namespace Coin.API
 {
@@ -53,7 +54,10 @@ namespace Coin.API
             services.AddOptions();
             services.Configure<BlockmainiaOptions>(Configuration);
             services.AddSyncProvider<CoinProto>("coins");
-            services.AddPubSubBlockGraphProvider<CoinProto>(new Core.API.MQTT.NodeEndPoint(brokerSection.GetValue<string>("host"), brokerSection.GetValue<int>("port")));
+            services.AddPubSubBlockGraphProvider<CoinProto>
+                (
+                    new Core.API.MQTT.NodeEndPoint(brokerSection.GetValue<string>("host"), brokerSection.GetValue<int>("port"))
+                );
             services.AddDbContext();
             services.AddUnitOfWork();
             services.AddDataKeysProtection();

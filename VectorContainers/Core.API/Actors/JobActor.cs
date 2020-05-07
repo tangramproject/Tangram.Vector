@@ -134,7 +134,7 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="next"></param>
         /// <returns></returns>
-        private async Task<JobProto<TAttach>> AddJob(TAttach next)
+        private async Task<JobProto<TAttach>> AddJob(BaseGraphProto<TAttach> next)
         {
             if (next.IsDefault())
                 throw new ArgumentNullException(nameof(next));
@@ -143,13 +143,11 @@ namespace Core.API.Actors
 
             try
             {
-                var n = next as BaseGraphProto<TAttach>;
-
                 job = new JobProto<TAttach>
                 {
                     Epoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    Hash = n.Block.Hash,
-                    Model = n,
+                    Hash = next.Block.Hash,
+                    Model = next,
                     ExpectedTotalNodes = 4,
                     Node = httpClientService.NodeIdentity,
                     TotalNodes = httpClientService.Members.Count(),
@@ -157,7 +155,7 @@ namespace Core.API.Actors
                 };
 
                 job.Nodes = new List<ulong>();
-                job.Nodes.AddRange(n.Deps?.Select(n => n.Block.Node));
+                job.Nodes.AddRange(next.Deps?.Select(n => n.Block.Node));
 
                 job.WaitingOn = new List<ulong>();
                 job.WaitingOn.AddRange(httpClientService.Members.Select(k => k.Key).ToArray());
@@ -193,7 +191,7 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="next"></param>
         /// <returns></returns>
-        private async Task<JobProto<TAttach>> ExistingJob(TAttach next)
+        private async Task<JobProto<TAttach>> ExistingJob(BaseGraphProto<TAttach> next)
         {
             if (next.IsDefault())
                 throw new ArgumentNullException(nameof(next));
@@ -202,13 +200,12 @@ namespace Core.API.Actors
 
             try
             {
-                var n = next as BaseGraphProto<TAttach>;
-                var jobProto = await jobRepository.GetFirstOrDefault(x => x.Hash.Equals(n.Block.Hash));
+                var jobProto = await jobRepository.GetFirstOrDefault(x => x.Hash.Equals(next.Block.Hash));
 
                 if (jobProto != null)
                 {
                     jobProto.Nodes = new List<ulong>();
-                    jobProto.Nodes.AddRange(n.Deps?.Select(n => n.Block.Node));
+                    jobProto.Nodes.AddRange(next.Deps?.Select(n => n.Block.Node));
 
                     jobProto.WaitingOn = new List<ulong>();
                     jobProto.WaitingOn.AddRange(httpClientService.Members.Select(k => k.Key).ToArray());
@@ -220,7 +217,7 @@ namespace Core.API.Actors
                         ClearWaitingOn(jobProto);
                     }
 
-                    jobProto.Model = n;
+                    jobProto.Model = next;
 
                     await jobRepository.Include(jobProto);
 
@@ -240,14 +237,12 @@ namespace Core.API.Actors
         /// </summary>
         /// <param name="next"></param>
         /// <param name="job"></param>
-        public static JobState Incoming(JobProto<TAttach> job, TAttach next)
+        public static JobState Incoming(JobProto<TAttach> job, BaseGraphProto<TAttach> next)
         {
-            var n = next as BaseGraphProto<TAttach>;
-
             if (job.Nodes.Any())
             {
 
-                var nodes = job.Nodes?.Except(n.Deps.Select(x => x.Block.Node));
+                var nodes = job.Nodes?.Except(next.Deps.Select(x => x.Block.Node));
                 if (nodes.Any() != true)
                 {
                     return JobState.Blockmainia;
@@ -256,7 +251,7 @@ namespace Core.API.Actors
 
             if (job.WaitingOn.Any())
             {
-                var waitingOn = job.WaitingOn?.Except(n.Deps.Select(x => x.Block.Node));
+                var waitingOn = job.WaitingOn?.Except(next.Deps.Select(x => x.Block.Node));
                 if (waitingOn.Any() != true)
                 {
                     return JobState.Blockmainia;
@@ -287,13 +282,13 @@ namespace Core.API.Actors
                         !jobProto.Status.Equals(JobState.Running) &&
                         !jobProto.Status.Equals(JobState.Polished))
                     {
-                        await ExistingJob(next.Cast<TAttach>());
+                        await ExistingJob(next);
                     }
 
                     continue;
                 }
 
-                await AddJob(next.Cast<TAttach>());
+                await AddJob(next);
             }
         }
 

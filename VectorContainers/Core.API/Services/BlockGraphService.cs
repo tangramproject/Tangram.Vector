@@ -66,7 +66,7 @@ namespace Core.API.Services
 
                     sipActorProvider.Register(new HashedMessage(stored.Block.Hash.FromHex()));
 
-                    return null;
+                    return stored;
                 }
                 catch (Exception ex)
                 {

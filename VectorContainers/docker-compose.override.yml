@@ -5,16 +5,58 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
     ports:
-      - "80"
+      - "3001:3001"
+    volumes:
+      - ${APPDATA}/Tangram/Onion.API/onion:/app/onion
+
+  membership.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "4001:4001"
+    volumes:
+      - ${APPDATA}/Tangram/Membership.API/appsettings.json:/app/appsettings.json
+
+  broker.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "1883:80"
+    volumes:
+      - ${APPDATA}/Tangram/Broker.API/appsettings.json:/app/appsettings.json
+
+  ravendb:
+    ports:
+      - "32775:8080"
+    volumes:
+      - ${APPDATA}/Tangram/Ravendb/config:/opt/RavenDB/config
+      - ${APPDATA}/Tangram/Ravendb/data:/opt/RavenDB/Server/RavenData
+
+  coin.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5001:80"
+    volumes:
+      - ${APPDATA}/Tangram/Coin.API/appsettings.json:/app/appsettings.json
+
+  messagepool.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "6001:80"
+    volumes:
+      - ${APPDATA}/Tangram/MessagePool.API/appsettings.json:/app/appsettings.json
 
   tgmgateway:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=https://+:443;http://+:80
-      - ASPNETCORE_HTTPS_PORT=44388
+      #- ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_URLS=http://+:80
+      #- ASPNETCORE_HTTPS_PORT=44388
     ports:
-      - "10001:80"
-      - "44388:443"
+      - "8080:80"
+      #- "44388:443"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro

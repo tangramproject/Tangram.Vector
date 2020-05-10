@@ -1,6 +1,30 @@
 version: '3.4'
 
 services:
+  broker.api:
+    image: ${DOCKER_REGISTRY-}brokerapi
+    build:
+      context: .
+      dockerfile: Broker.API/Dockerfile
+
+  coin.api:
+    image: ${DOCKER_REGISTRY-}coinapi
+    build:
+      context: .
+      dockerfile: Coin.API/Dockerfile
+
+  membership.api:
+    image: ${DOCKER_REGISTRY-}membershipapi
+    build:
+      context: .
+      dockerfile: Membership.API/Dockerfile
+
+  messagepool.api:
+    image: ${DOCKER_REGISTRY-}messagepoolapi
+    build:
+      context: .
+      dockerfile: MessagePool.API/Dockerfile
+
   onion.api:
     image: ${DOCKER_REGISTRY-}onionapi
     build:
@@ -13,3 +37,5 @@ services:
       context: .
       dockerfile: TGMGateway/Dockerfile
 
+  ravendb:
+    image: ravendb/ravendb

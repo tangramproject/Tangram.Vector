@@ -20,6 +20,7 @@ jobs:
       uses: actions/checkout@master
     - name: Build Vector
       run:  |
+        cd Tangram.Vector
         dotnet restore Tangram.Vector.sln
         dotnet publish TGMNode --output publish/TGMNode --configuration Release
     #- name: Push to Octopus

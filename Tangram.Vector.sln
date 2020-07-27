@@ -1,0 +1,58 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28803.452
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E8DE6A81-3601-4229-B38D-EBAC19DCAE42}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TGMCore", "TGMCore\TGMCore.csproj", "{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TGMNode", "TGMNode\TGMNode.csproj", "{04AC85C3-F32D-4641-99DA-84322C891966}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Debug|x64.ActiveCfg = Debug|x64
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Debug|x64.Build.0 = Debug|x64
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Release|x64.ActiveCfg = Release|x64
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A}.Release|x64.Build.0 = Release|x64
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Debug|x64.ActiveCfg = Debug|x64
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Debug|x64.Build.0 = Debug|x64
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Release|x64.ActiveCfg = Release|x64
+		{04AC85C3-F32D-4641-99DA-84322C891966}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{8D7FCA1A-6ED0-4780-AF3B-3B655995D03A} = {E8DE6A81-3601-4229-B38D-EBAC19DCAE42}
+		{04AC85C3-F32D-4641-99DA-84322C891966} = {E8DE6A81-3601-4229-B38D-EBAC19DCAE42}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {89F13E13-009F-4FE0-A95A-47F2E1258CC7}
+	EndGlobalSection
+	GlobalSection(MonoDevelopProperties) = preSolution
+		Policies = $0
+		$0.DotNetNamingPolicy = $1
+		$1.DirectoryNamespaceAssociation = PrefixedHierarchical
+		$0.TextStylePolicy = $2
+		$2.inheritsSet = null
+		$2.scope = text/x-csharp
+		$0.CSharpFormattingPolicy = $3
+		$3.scope = text/x-csharp
+		$0.StandardHeader = $4
+		$0.VersionControlPolicy = $5
+	EndGlobalSection
+EndGlobal

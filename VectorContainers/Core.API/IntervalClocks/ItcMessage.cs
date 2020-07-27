@@ -1,1 +1,0 @@
-﻿using Itc4net;  namespace Core.API.IntervalTreeClocks {     public class ItcMessage     {         public string Text { get; }         public Stamp Stamp { get; }          public ItcMessage(string text, Stamp stamp)         {             Text = text;             Stamp = stamp;         }     } } 

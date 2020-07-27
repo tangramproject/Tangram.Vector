@@ -1,28 +1,13 @@
 # IDE
 /.vscode
-VectorContainers/.vs
-VectorContainers/.DS_Store
-VectorContainers/.vs/VectorContainers/xs/sqlite3/db.lock
+/.vs
 
 # misc
 /bin
 /obj
-VectorContainers/Coin.API/snapshots/
 
+**/snapshots/
 **/publish/
-**/Coin.API/VData/
-**/TGMGateway/publish/
-**/Core.API/publish/
-**/MessagePool.API/VData/
-
-VectorContainers/MessagePool.API/obj/Debug/netcoreapp2.1/MessagePool.API.assets.cache
-VectorContainers/MessagePool.API/obj/Debug/netcoreapp2.1/MessagePool.API.RazorAssemblyInfo.cache
-VectorContainers/MessagePool.API/obj/Debug/netcoreapp2.1/MessagePool.API.RazorAssemblyInfo.cs
-VectorContainers/MessagePool.API/obj/MessagePool.API.csproj.nuget.cache
-VectorContainers/MessagePool.API/obj/MessagePool.API.csproj.nuget.g.props
-VectorContainers/MessagePool.API/obj/MessagePool.API.csproj.nuget.g.targets
-VectorContainers/MessagePool\.API/obj/project\.assets\.json
-
 
 *.Jnrl
 *.rhp

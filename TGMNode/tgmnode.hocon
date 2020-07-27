@@ -1,0 +1,49 @@
+﻿ akka {
+        stdout-loglevel : DEBUG
+        loglevel : DEBUG
+        log-config-on-start : on
+        loggers = ["Akka.Logger.Serilog.SerilogLogger, Akka.Logger.Serilog"]
+        actor.provider = "Akka.Cluster.ClusterActorRefProvider, Akka.Cluster"
+        remote {
+            log-received-messages : on
+            log-sent-messages : on
+            gremlin : {
+                debug : on
+            }
+            dot-netty.tcp {
+                hostname = localhost
+                port = 7001
+            }
+        }
+        cluster {
+            downing-provider-class = "TGMCore.Actors.ClusterStrategy.SplitBrainResolverProvider, TGMCore"
+
+            split-brain-resolver {
+                # Enable one of the available strategies (see descriptions below):
+                # static-quorum, keep-majority, keep-oldest, keep-referee 
+                active-strategy = static-quorum
+                
+                # Decision is taken by the strategy when there has been no membership or
+                # reachability changes for this duration, i.e. the cluster state is stable.
+                stable-after = 20s
+
+                # The strategy named static-quorum will down the unreachable nodes if the number 
+                # of remaining nodes are greater than or equal to a configured quorum-size. 
+                # Otherwise, it will down the reachable nodes
+                static-quorum {
+                    # if the 'role' is defined the decision is based only on members with that 'role'
+                    role = ""
+                    # Minimum number of nodes that the cluster must have (not the total size)
+                    # Note that you must not add more members to the cluster than quorum-size * 2 - 1, 
+                    # because then both sides may down each other and thereby form two separate clusters
+                    quorum-size = 4
+                }
+            }
+            allow-weakly-up-members : on
+            seed-nodes = ["akka.tcp://tangram-system@127.0.0.1:4053"]
+            roles : [seed]
+            debug : {
+                verbose-receive-gossip-logging : on
+            }
+        }
+    }

@@ -295,11 +295,12 @@ namespace TGMCore.Actors
             }
         }
 
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="unitOfWork"></param>
-        /// <param name="httpClientService"></param>
+        /// <param name="clusterProvider"></param>
         /// <returns></returns>
         public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider) =>
             Props.Create(() => new JobActor<TAttach>(unitOfWork, clusterProvider));

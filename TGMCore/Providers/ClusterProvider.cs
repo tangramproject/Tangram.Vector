@@ -23,6 +23,15 @@ namespace TGMCore.Providers
         /// <summary>
         /// 
         /// </summary>
+        /// <returns></returns>
+        public ClusterEvent.CurrentClusterState GetCurrentClusterState()
+        {
+            return _cluster.State;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="role"></param>
         /// <returns></returns>
         public IEnumerable<Member> GetMembers(string role = "")

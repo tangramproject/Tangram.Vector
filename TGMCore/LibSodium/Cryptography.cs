@@ -105,12 +105,14 @@ namespace TGMCore.LibSodium
 
         /// <summary>
         /// Generates a KeyPair
-        /// </summary>
+        /// </summary>s
         /// <returns>The pair.</returns>
-        public static KeyPairDto KeyPair()
+        public static Secp256k1ZKP.Net.KeyPair KeyPair()
         {
-            var kp = PublicKeyBox.GenerateKeyPair();
-            return new KeyPairDto() { PublicKey = kp.PublicKey, SecretKey = kp.PrivateKey };
+            var k = PublicKeyBox.GenerateKeyPair();
+            var kp = new Secp256k1ZKP.Net.KeyPair(k.PublicKey, k.PrivateKey);
+
+            return kp;
         }
 
         /// <summary>
@@ -118,10 +120,12 @@ namespace TGMCore.LibSodium
         /// </summary>
         /// <returns>The pair auth.</returns>
         /// <param name="seed">Seed.</param>
-        public static KeyPairDto KeyPairAuth(byte[] seed = null)
+        public static Secp256k1ZKP.Net.KeyPair KeyPairAuth(byte[] seed = null)
         {
-            var kp = PublicKeyAuth.GenerateKeyPair(seed);
-            return new KeyPairDto() { PublicKey = kp.PublicKey, SecretKey = kp.PrivateKey };
+            var k = PublicKeyAuth.GenerateKeyPair(seed);
+            var kp = new Secp256k1ZKP.Net.KeyPair(k.PublicKey, k.PrivateKey);
+
+            return kp;
         }
 
         /// <summary>
@@ -129,10 +133,12 @@ namespace TGMCore.LibSodium
         /// </summary>
         /// <returns>The pair box.</returns>
         /// <param name="privateKey">Private key.</param>
-        public static KeyPairDto KeyPairBox(byte[] privateKey = null)
+        public static Secp256k1ZKP.Net.KeyPair KeyPairBox(byte[] privateKey = null)
         {
-            var kp = PublicKeyBox.GenerateKeyPair(privateKey);
-            return new KeyPairDto() { PublicKey = kp.PublicKey, SecretKey = kp.PrivateKey };
+            var k = PublicKeyBox.GenerateKeyPair(privateKey);
+            var kp = new Secp256k1ZKP.Net.KeyPair(k.PublicKey, k.PrivateKey);
+
+            return kp;
         }
 
         /// <summary>

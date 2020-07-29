@@ -9,6 +9,7 @@ namespace TGMCore.Providers
     public interface IClusterProvider
     {
         IEnumerable<Member> GetMembers(string role = "");
+        ClusterEvent.CurrentClusterState GetCurrentClusterState();
         ulong GetSelfUniqueAddress();
         int GetInitialQuorumSize();
     }

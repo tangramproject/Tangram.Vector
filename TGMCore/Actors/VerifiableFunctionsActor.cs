@@ -141,6 +141,7 @@ namespace TGMCore.Actors
         /// <summary>
         /// 
         /// </summary>
+        /// <param name="signingActorProvider"></param>
         /// <returns></returns>
         public static Props Create(ISigningActorProvider signingActorProvider) =>
             Props.Create(() => new VerifiableFunctionsActor(signingActorProvider));

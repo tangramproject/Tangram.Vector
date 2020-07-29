@@ -48,7 +48,6 @@ namespace TGMCore
                 await Task.WhenAny(_executingTask, Task.Delay(Timeout.Infinite,
                                                               cancellationToken));
             }
-
         }
 
         public virtual void Dispose()

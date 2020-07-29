@@ -504,7 +504,7 @@ namespace TGMCore.Actors
         /// 
         /// </summary>
         /// <param name="unitOfWork"></param>
-        /// <param name="httpService"></param>
+        /// <param name="clusterProvider"></param>
         /// <param name="interpretActorProvider"></param>
         /// <param name="processActorProvider"></param>
         /// <param name="signingActorProvider"></param>

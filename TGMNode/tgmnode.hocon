@@ -1,27 +1,23 @@
 ﻿ akka {
-        stdout-loglevel : DEBUG
-        loglevel : DEBUG
-        log-config-on-start : on
         loggers = ["Akka.Logger.Serilog.SerilogLogger, Akka.Logger.Serilog"]
         actor.provider = "Akka.Cluster.ClusterActorRefProvider, Akka.Cluster"
         remote {
-            log-received-messages : on
-            log-sent-messages : on
-            gremlin : {
-                debug : on
-            }
             dot-netty.tcp {
-                hostname = localhost
+                transport-class = "Akka.Remote.Transport.DotNetty.TcpTransport, Akka.Remote"
+                transport-protocol = tcp
+                dns-use-ipv6 = false
+                enforce-ip-family = true
+                hostname = "0.0.0.0"   
                 port = 7001
             }
         }
         cluster {
-            downing-provider-class = "TGMCore.Actors.ClusterStrategy.SplitBrainResolverProvider, TGMCore"
-
+            akka.extensions = ["Akka.Cluster.Tools.PublishSubscribe.DistributedPubSubExtensionProvider,Akka.Cluster.Tools"]
+            downing-provider-class = "Akka.Cluster.SplitBrainResolver, Akka.Cluster"
             split-brain-resolver {
                 # Enable one of the available strategies (see descriptions below):
                 # static-quorum, keep-majority, keep-oldest, keep-referee 
-                active-strategy = static-quorum
+                active-strategy = keep-majority
                 
                 # Decision is taken by the strategy when there has been no membership or
                 # reachability changes for this duration, i.e. the cluster state is stable.
@@ -39,11 +35,36 @@
                     quorum-size = 4
                 }
             }
-            allow-weakly-up-members : on
-            seed-nodes = ["akka.tcp://tangram-system@127.0.0.1:4053"]
-            roles : [seed]
-            debug : {
-                verbose-receive-gossip-logging : on
-            }
+            auto-down-unreachable-after = off
+            seed-nodes = ["akka.tcp://tangram-system@0.0.0.0:7001", "akka.tcp://tangram-system@0.0.0.0:6001"]
+            roles : []
+        }
+        # Settings for the DistributedPubSub extension
+        akka.cluster.pub-sub {
+          # Actor name of the mediator actor, /system/distributedPubSubMediator
+          name = distributedPubSubMediator
+
+          # Start the mediator on members tagged with this role.
+          # All members are used if undefined or empty.
+          role = ""
+
+          # The routing logic to use for 'Send'
+          # Possible values: random, round-robin, broadcast
+          routing-logic = random
+
+          # How often the DistributedPubSubMediator should send out gossip information
+          gossip-interval = 1s
+
+          # Removed entries are pruned after this duration
+          removed-time-to-live = 120s
+
+          # Maximum number of elements to transfer in one message when synchronizing the registries.
+          # Next chunk will be transferred in next round of gossip.
+          max-delta-elements = 3000
+
+          # The id of the dispatcher to use for DistributedPubSubMediator actors. 
+          # If not specified default dispatcher is used.
+          # If specified you need to define the settings of the actual dispatcher.
+          use-dispatcher = ""
         }
     }

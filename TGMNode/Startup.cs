@@ -64,6 +64,8 @@ namespace TGMNode
             services.AddTransactionService();
             services.AddVerifiableFunctionsActorProvider();
             services.AddClusterProvider("tgmnode.hocon");
+            services.AddIPublisherProvider<TransactionProto>();
+            services.AddSubscriberProvider<TransactionProto>("blockgraph");
         }
 
         /// <summary>
@@ -98,6 +100,7 @@ namespace TGMNode
             {
                 app.ApplicationServices.GetService<ActorSystem>();
                 app.ApplicationServices.GetService<ISipActorProvider>();
+                app.ApplicationServices.GetService<ISubscriberBaseGraphProvider>();
             });
 
             lifetime.ApplicationStopping.Register(() =>

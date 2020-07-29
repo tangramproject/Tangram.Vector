@@ -151,5 +151,57 @@ namespace TGMCore.Extensions
 
             return services;
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="services"></param>
+        /// <param name="topic"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddIPublisherProvider<TAttach>(this IServiceCollection services)
+        {
+            services.AddSingleton<IPublisherBaseGraphProvider, PublisherBaseGraphProvider<TAttach>>(sp =>
+            {
+                var publisher = new PublisherBaseGraphProvider<TAttach>
+                (
+                    sp.GetService<ActorSystem>(),
+                    sp.GetService<IUnitOfWork>(),
+                    sp.GetService<IClusterProvider>(),
+                    sp.GetService<IBaseGraphRepository<TAttach>>(),
+                    sp.GetService<IJobRepository<TAttach>>(),
+                    sp.GetService<ILogger<PublisherBaseGraphProvider<TAttach>>>()
+                );
+
+                return publisher;
+            });
+
+            return services;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="services"></param>
+        /// <param name="topic"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddSubscriberProvider<TAttach>(this IServiceCollection services, string topic)
+        {
+            services.AddSingleton<ISubscriberBaseGraphProvider, SubscriberBaseGraphProvider<TAttach>>(sp =>
+            {
+                var subscriber = new SubscriberBaseGraphProvider<TAttach>
+                (
+                     sp.GetService<ActorSystem>(),
+                     topic,
+                     sp.GetService<Services.IBlockGraphService<TAttach>>(),
+                     sp.GetService<ILogger<SubscriberBaseGraphProvider<TAttach>>>()
+                 );
+
+                return subscriber;
+            });
+            
+            return services;
+        }
     }
 }

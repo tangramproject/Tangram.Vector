@@ -12,6 +12,7 @@ using Akka.Event;
 using TGMCore.Providers;
 using TGMCore.Helper;
 using TGMCore.Model;
+using TGMCore.Messages;
 
 namespace TGMCore.Actors
 {
@@ -39,7 +40,7 @@ namespace TGMCore.Actors
 
             _mediator = DistributedPubSub.Get(Context.System).Mediator;
 
-            ReceiveAsync<string>(async topic => await Publish(topic));
+            ReceiveAsync<PublishMessage>(async message => await Publish(message));
         }
 
         /// <summary>
@@ -47,7 +48,7 @@ namespace TGMCore.Actors
         /// </summary>
         /// <param name="topic"></param>
         /// <returns></returns>
-        private async Task Publish(string topic)
+        private async Task Publish(PublishMessage message)
         {
             SemaphoreSlim throttler = null;
 
@@ -82,7 +83,7 @@ namespace TGMCore.Actors
                     {
                         try
                         {
-                            _mediator.Tell(new Publish(topic, Util.SerializeProto(batch)));
+                            _mediator.Tell(new Publish(message.Topic, Util.SerializeProto(batch)));
 
                             var blockInfos = batch.Select(x => new BlockInfoProto { Hash = x.Block.Hash, Node = x.Block.Node, Round = x.Block.Round });
 

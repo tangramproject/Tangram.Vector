@@ -15,7 +15,7 @@ namespace TGMCore.Actors
     {
         private readonly ILoggingAdapter _log = Context.GetLogger();
 
-        public SubscriberBaseGraphActor(IBlockGraphService<TAttach> blockGraphService, string topic)
+        public SubscriberBaseGraphActor(string topic, IBlockGraphService<TAttach> blockGraphService)
         {
             var mediator = DistributedPubSub.Get(Context.System).Mediator;
 
@@ -52,7 +52,7 @@ namespace TGMCore.Actors
                     && subscribeAck.Subscribe.Ref.Equals(Self)
                     && subscribeAck.Subscribe.Group == null)
                 {
-                    _log.Info("subscribing to SubscriberBaseGraphActor");
+                    _log.Info($"subscribing to {subscribeAck.Subscribe.Topic}");
                 }
             });
         }
@@ -60,9 +60,10 @@ namespace TGMCore.Actors
         /// <summary>
         /// 
         /// </summary>
+        /// <param name="topic"></param>
         /// <param name="blockGraphService"></param>
         /// <returns></returns>
-        public static Props Create(IBlockGraphService<TAttach> blockGraphService, string topic) =>
-            Props.Create(() => new SubscriberBaseGraphActor<TAttach>(blockGraphService, topic));
+        public static Props Create(string topic, IBlockGraphService<TAttach> blockGraphService) =>
+            Props.Create(() => new SubscriberBaseGraphActor<TAttach>(topic, blockGraphService));
     }
 }

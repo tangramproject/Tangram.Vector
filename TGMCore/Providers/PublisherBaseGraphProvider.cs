@@ -1,6 +1,7 @@
 ﻿// TGMCore by Matthew Hellyer is licensed under CC BY-NC-ND 4.0.
 // To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-nd/4.0
 
+using System.Threading.Tasks;
 using Akka.Actor;
 using Microsoft.Extensions.Logging;
 using TGMCore.Actors;
@@ -16,11 +17,11 @@ namespace TGMCore.Providers
 
         public PublisherBaseGraphProvider(ActorSystem actorSystem, IUnitOfWork unitOfWork, IClusterProvider clusterProvider,
             IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository,
-            ILogger<PublisherBaseGraphProvider<TAttach>> logger)
+            ILogger<PublisherBaseGraphProvider<TAttach>> logger, string topic = null)
         {
             _logger = logger;
 
-            var publisher = PublisherBaseGraphActor<TAttach>.Create(unitOfWork, clusterProvider, baseGraphRepository, jobRepository);
+            var publisher = PublisherBaseGraphActor<TAttach>.Create(unitOfWork, clusterProvider, baseGraphRepository, jobRepository, topic);
 
             _actor = actorSystem.ActorOf(publisher, "publisher-actor");
         }
@@ -29,9 +30,11 @@ namespace TGMCore.Providers
         /// 
         /// </summary>
         /// <param name="message"></param>
-        public void Publish(PublishMessage message)
+        public Task PublishAsync(PublishMessage message)
         {
             _actor.Tell(message);
+
+            return Task.CompletedTask;
         }
     }
 }

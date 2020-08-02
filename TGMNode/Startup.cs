@@ -64,7 +64,7 @@ namespace TGMNode
             services.AddTransactionService();
             services.AddVerifiableFunctionsActorProvider();
             services.AddClusterProvider("tgmnode.hocon");
-            services.AddIPublisherProvider<TransactionProto>();
+            services.AddPublisherProvider<TransactionProto>("blockgraph");
             services.AddSubscriberProvider<TransactionProto>("blockgraph");
         }
 

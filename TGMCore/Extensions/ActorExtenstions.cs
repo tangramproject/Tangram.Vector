@@ -99,6 +99,7 @@ namespace TGMCore.Extensions
                     sp.GetService<IInterpretActorProvider<TAttach>>(),
                     sp.GetService<IProcessActorProvider<TAttach>>(),
                     sp.GetService<ISigningActorProvider>(),
+                    sp.GetService<IPublisherBaseGraphProvider>(),
                     sp.GetService<ILogger<SipActorProvider<TAttach>>>()
                 );
 
@@ -159,7 +160,7 @@ namespace TGMCore.Extensions
         /// <param name="services"></param>
         /// <param name="topic"></param>
         /// <returns></returns>
-        public static IServiceCollection AddIPublisherProvider<TAttach>(this IServiceCollection services)
+        public static IServiceCollection AddPublisherProvider<TAttach>(this IServiceCollection services, string topic = null)
         {
             services.AddSingleton<IPublisherBaseGraphProvider, PublisherBaseGraphProvider<TAttach>>(sp =>
             {
@@ -170,7 +171,8 @@ namespace TGMCore.Extensions
                     sp.GetService<IClusterProvider>(),
                     sp.GetService<IBaseGraphRepository<TAttach>>(),
                     sp.GetService<IJobRepository<TAttach>>(),
-                    sp.GetService<ILogger<PublisherBaseGraphProvider<TAttach>>>()
+                    sp.GetService<ILogger<PublisherBaseGraphProvider<TAttach>>>(),
+                    topic
                 );
 
                 return publisher;

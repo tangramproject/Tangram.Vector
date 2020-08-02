@@ -8,10 +8,22 @@ namespace TGMCore.Messages
         public string Topic { get; set; }
         public object Payload { get; set; }
 
+        public PublishMessage()
+        { }
+
         public PublishMessage(string topic, object payload)
         {
             Topic = topic;
             Payload = payload;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public static PublishMessage Empty()
+        {
+            return new PublishMessage();
         }
     }
 }

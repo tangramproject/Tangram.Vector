@@ -27,16 +27,17 @@ namespace TGMCore.Actors
         private readonly IClusterProvider _clusterProvider;
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
-
         private readonly IActorRef _mediator;
+        private readonly string _topic;
 
         public PublisherBaseGraphActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider,
-            IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository)
+            IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository, string topic = null)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
             _baseGraphRepository = baseGraphRepository;
             _jobRepository = jobRepository;
+            _topic = topic;
 
             _mediator = DistributedPubSub.Get(Context.System).Mediator;
 
@@ -83,7 +84,8 @@ namespace TGMCore.Actors
                     {
                         try
                         {
-                            _mediator.Tell(new Publish(message.Topic, Util.SerializeProto(batch)));
+                            var topic = _topic ?? message.Topic;
+                            _mediator.Tell(new Publish(topic, Util.SerializeProto(batch)));
 
                             var blockInfos = batch.Select(x => new BlockInfoProto { Hash = x.Block.Hash, Node = x.Block.Node, Round = x.Block.Round });
 
@@ -132,17 +134,30 @@ namespace TGMCore.Actors
                     var filter = blockInfos.Select(async x => await _jobRepository.GetFirstOrDefault(g => g.Hash == x.Hash));
                     for (var i = filter.GetEnumerator(); i.MoveNext();)
                     {
-                        var x = i.Current;
-                        if (x.Result.Status != JobState.Started &&
-                            x.Result.Status != JobState.Queued &&
-                            x.Result.Status != JobState.Answered &&
-                            x.Result.Status != JobState.Dialling)
+                        switch (i.Current.Result.Status)
                         {
-                            continue;
+                            case JobState.Started:
+                            case JobState.Queued:
+                            case JobState.Answered:
+                            case JobState.Dialling:
+                                i.Current.Result.Status = state;
+                                session.Store(i.Current, null, i.Current.Result.Id);
+                                break;
+                            case JobState.Running:
+                                break;
+                            case JobState.Dead:
+                                break;
+                            case JobState.Pending:
+                                break;
+                            case JobState.Partial:
+                                break;
+                            case JobState.Blockmainia:
+                                break;
+                            case JobState.Polished:
+                                break;
+                            default:
+                                break;
                         }
-
-                        x.Result.Status = state;
-                        session.Store(x, null, x.Result.Id);
                     }
 
                     session.SaveChanges();
@@ -209,7 +224,7 @@ namespace TGMCore.Actors
         /// <param name="jobRepository"></param>
         /// <returns></returns>
         public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider,
-            IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository) =>
-            Props.Create(() => new PublisherBaseGraphActor<TAttach>(unitOfWork, clusterProvider, baseGraphRepository, jobRepository));
+            IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository, string topic) =>
+            Props.Create(() => new PublisherBaseGraphActor<TAttach>(unitOfWork, clusterProvider, baseGraphRepository, jobRepository, topic));
     }
 }

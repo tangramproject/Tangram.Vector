@@ -25,12 +25,13 @@ namespace TGMCore.Actors
         private readonly IInterpretActorProvider<TAttach> _interpretActorProvider;
         private readonly IProcessActorProvider<TAttach> _processActorProvider;
         private readonly ISigningActorProvider _signingActorProvider;
+        private readonly IPublisherBaseGraphProvider _publisherBaseGraphProvider;
         private readonly int _totalNodes;
         private readonly ILoggingAdapter _logger;
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
         private readonly IBaseBlockIDRepository<TAttach> _baseBlockIDRepository;
-
+        
         private Graph Graph;
         private Config Config;
 
@@ -42,13 +43,15 @@ namespace TGMCore.Actors
 
         public GraphActor(IUnitOfWork unitOfWork,
             IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider)
+            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider,
+            IPublisherBaseGraphProvider publisherBaseGraphProvider)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
             _interpretActorProvider = interpretActorProvider;
             _processActorProvider = processActorProvider;
             _signingActorProvider = signingActorProvider;
+            _publisherBaseGraphProvider = publisherBaseGraphProvider;
 
             _logger = Context.GetLogger();
 
@@ -104,6 +107,7 @@ namespace TGMCore.Actors
             }
 
             await InitializeBlocks(message);
+            await _publisherBaseGraphProvider.PublishAsync(PublishMessage.Empty());
         }
 
         /// <summary>
@@ -190,7 +194,7 @@ namespace TGMCore.Actors
                     }
                 }
 
-                JobDelivery(message);
+                // JobDelivery(message);
 
                 await Process(new ProcessBlockMessage<TAttach>(isSet));
             }
@@ -200,13 +204,13 @@ namespace TGMCore.Actors
         /// 
         /// </summary>
         /// <param name="message"></param>
-        private void JobDelivery(HashedMessage message)
-        {
-            var name = $"delivery-actor-{Util.HashToId(message.Hash.ToHex())}";
-            var atLeastOnceProps = AtLeastOnceDeliveryActor.Create(_jobActor, message.Hash.ToHex());
+        //private void JobDelivery(HashedMessage message)
+        //{
+        //    var name = $"delivery-actor-{Util.HashToId(message.Hash.ToHex())}";
+        //    var atLeastOnceProps = AtLeastOnceDeliveryActor.Create(_jobActor, message.Hash.ToHex());
 
-            _atLeastOnceDeliveryActor = Context.ActorOf(atLeastOnceProps, name);
-        }
+        //    _atLeastOnceDeliveryActor = Context.ActorOf(atLeastOnceProps, name);
+        //}
 
         /// <summary>
         /// 
@@ -510,7 +514,7 @@ namespace TGMCore.Actors
         /// <param name="signingActorProvider"></param>
         /// <returns></returns>
         public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider) =>
-            Props.Create(() => new GraphActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider));
+            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPublisherBaseGraphProvider publisherBaseGraphProvider) =>
+            Props.Create(() => new GraphActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, publisherBaseGraphProvider));
     }
 }

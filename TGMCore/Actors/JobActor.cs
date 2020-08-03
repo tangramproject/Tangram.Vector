@@ -24,44 +24,17 @@ namespace TGMCore.Actors
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
 
-        private readonly Dictionary<IActorRef, HashSet<long>> _ackBuffer;
-
         public byte[] Id { get; private set; }
 
         public JobActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
-
             _logger = Context.GetLogger();
-
-            _ackBuffer = new Dictionary<IActorRef, HashSet<long>>();
-
             _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             _jobRepository = unitOfWork.CreateJobOf<TAttach>();
 
-            Receive<ReliableDeliveryEnvelopeMessage<WriteMessage>>(
-                write => _ackBuffer.ContainsKey(Sender) && _ackBuffer[Sender].Contains(write.MessageId),
-                write =>
-            {
-                Sender.Tell(new ReliableDeliveryAckMessage(write.MessageId));
-            });
-
-
-            ReceiveAsync<ReliableDeliveryEnvelopeMessage<WriteMessage>>(async write =>
-            {
-                Sender.Tell(new ReliableDeliveryAckMessage(write.MessageId));
-
-                if (!_ackBuffer.ContainsKey(Sender))
-                {
-                    _ackBuffer.Add(Sender, new HashSet<long>());
-                }
-
-                _ackBuffer[Sender].Add(write.MessageId);
-
-                await Register(new HashedMessage(write.Message.Content.FromHex()));
-                await Sender.GracefulStop(TimeSpan.FromSeconds(5));
-            });
+            ReceiveAsync<HashedMessage>(async message => await Register(message));
         }
 
         /// <summary>
@@ -99,6 +72,8 @@ namespace TGMCore.Actors
                     await _baseGraphRepository.Include(blocks, _clusterProvider.GetSelfUniqueAddress());
                     await AddOrUpdateJob(blockHashLookup);
                 }
+
+                await Sender.GracefulStop(TimeSpan.FromSeconds(5));
 
                 Context.Stop(Self);
             }

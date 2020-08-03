@@ -194,23 +194,11 @@ namespace TGMCore.Actors
                     }
                 }
 
-                // JobDelivery(message);
+                _jobActor.Tell(message);
 
                 await Process(new ProcessBlockMessage<TAttach>(isSet));
             }
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="message"></param>
-        //private void JobDelivery(HashedMessage message)
-        //{
-        //    var name = $"delivery-actor-{Util.HashToId(message.Hash.ToHex())}";
-        //    var atLeastOnceProps = AtLeastOnceDeliveryActor.Create(_jobActor, message.Hash.ToHex());
-
-        //    _atLeastOnceDeliveryActor = Context.ActorOf(atLeastOnceProps, name);
-        //}
 
         /// <summary>
         /// 

@@ -30,14 +30,13 @@ namespace TGMCore.Actors
         private readonly IActorRef _mediator;
         private readonly string _topic;
 
-        public PublisherBaseGraphActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider,
-            IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository, string topic = null)
+        public PublisherBaseGraphActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, string topic = null)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
-            _baseGraphRepository = baseGraphRepository;
-            _jobRepository = jobRepository;
             _topic = topic;
+            _jobRepository = _unitOfWork.CreateJobOf<TAttach>();
+            _baseGraphRepository = _unitOfWork.CreateBaseGraphOf<TAttach>();
 
             _mediator = DistributedPubSub.Get(Context.System).Mediator;
 
@@ -223,8 +222,7 @@ namespace TGMCore.Actors
         /// <param name="baseGraphRepository"></param>
         /// <param name="jobRepository"></param>
         /// <returns></returns>
-        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider,
-            IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository, string topic) =>
-            Props.Create(() => new PublisherBaseGraphActor<TAttach>(unitOfWork, clusterProvider, baseGraphRepository, jobRepository, topic));
+        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, string topic) =>
+            Props.Create(() => new PublisherBaseGraphActor<TAttach>(unitOfWork, clusterProvider, topic));
     }
 }

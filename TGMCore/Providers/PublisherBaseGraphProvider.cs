@@ -21,7 +21,7 @@ namespace TGMCore.Providers
         {
             _logger = logger;
 
-            var publisher = PublisherBaseGraphActor<TAttach>.Create(unitOfWork, clusterProvider, baseGraphRepository, jobRepository, topic);
+            var publisher = PublisherBaseGraphActor<TAttach>.Create(unitOfWork, clusterProvider, topic);
 
             _actor = actorSystem.ActorOf(publisher, "publisher-actor");
         }

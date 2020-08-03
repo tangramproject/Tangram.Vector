@@ -8,7 +8,7 @@ using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
-    public class SubscriberBaseGraphProvider<TAttach> : ISubscriberBaseGraphProvider
+    public class SubscriberBaseGraphProvider<TAttach> : ISubProvider
     {
         private readonly IActorRef _actor;
         private readonly ILogger _logger;
@@ -20,7 +20,7 @@ namespace TGMCore.Providers
 
             var subscriber = SubscriberBaseGraphActor<TAttach>.Create(topic, blockGraphService);
 
-            _actor = actorSystem.ActorOf(subscriber, "publisher-actor");
+            _actor = actorSystem.ActorOf(subscriber, "subscriber-actor");
         }
     }
 }

@@ -20,20 +20,20 @@ namespace TGMCore.Actors
         private readonly IInterpretActorProvider<TAttach> _interpretActorProvider;
         private readonly IProcessActorProvider<TAttach> _processActorProvider;
         private readonly ISigningActorProvider _signingActorProvider;
-        private readonly IPublisherBaseGraphProvider _publisherBaseGraphProvider;
+        private readonly IPubProvider _pubProvider;
         private readonly ILoggingAdapter _logger;
 
         protected Dictionary<string, IActorRef> BoostGraphs;
 
         public SipActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-           IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPublisherBaseGraphProvider publisherBaseGraphProvider)
+           IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPubProvider pubProvider)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
             _interpretActorProvider = interpretActorProvider;
             _processActorProvider = processActorProvider;
             _signingActorProvider = signingActorProvider;
-            _publisherBaseGraphProvider = publisherBaseGraphProvider;
+            _pubProvider = pubProvider;
 
             _logger = Context.GetLogger();
 
@@ -98,7 +98,7 @@ namespace TGMCore.Actors
             if (!BoostGraphs.TryGetValue(hash.ToHex(), out IActorRef actorRef))
             {
                 var name = $"graph-actor-{Helper.Util.HashToId(hash.ToHex())}";
-                var boostGraphActorProps = GraphActor<TAttach>.Create(_unitOfWork, _clusterProvider, _interpretActorProvider, _processActorProvider, _signingActorProvider, _publisherBaseGraphProvider);
+                var boostGraphActorProps = GraphActor<TAttach>.Create(_unitOfWork, _clusterProvider, _interpretActorProvider, _processActorProvider, _signingActorProvider, _pubProvider);
                 var @ref = Context.ActorOf(boostGraphActorProps, name);
 
                 BoostGraphs.TryAdd(hash.ToHex(), @ref);
@@ -119,7 +119,7 @@ namespace TGMCore.Actors
         /// <param name="signingActorProvider"></param>
         /// <returns></returns>
         public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPublisherBaseGraphProvider publisherBaseGraphProvider) =>
-            Props.Create(() => new SipActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, publisherBaseGraphProvider));
+            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPubProvider pubProvider) =>
+            Props.Create(() => new SipActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, pubProvider));
     }
 }

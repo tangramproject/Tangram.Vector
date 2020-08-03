@@ -16,7 +16,7 @@ namespace TGMCore.Providers
         public GraphActorProvider(ActorSystem actotSystem, IUnitOfWork unitOfWork,
             IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
             IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider,
-            IPublisherBaseGraphProvider publisherBaseGraphProvider)
+            IPubProvider pubProvider)
         {
             actor = actotSystem.ActorOf(Props.Create(() => new GraphActor<TAttach>
                 (
@@ -25,7 +25,7 @@ namespace TGMCore.Providers
                     interpretActorProvider,
                     processActorProvider,
                     signingActorProvider,
-                    publisherBaseGraphProvider
+                    pubProvider
                 )), "graph-actor");
         }
 

@@ -3,15 +3,15 @@
 
 namespace TGMCore.Messages
 {
-    public class PublishMessage
+    public class ChatMessage
     {
         public string Topic { get; set; }
         public object Payload { get; set; }
 
-        public PublishMessage()
+        public ChatMessage()
         { }
 
-        public PublishMessage(string topic, object payload)
+        public ChatMessage(string topic, object payload)
         {
             Topic = topic;
             Payload = payload;
@@ -21,9 +21,9 @@ namespace TGMCore.Messages
         /// 
         /// </summary>
         /// <returns></returns>
-        public static PublishMessage Empty()
+        public static ChatMessage Empty()
         {
-            return new PublishMessage();
+            return new ChatMessage();
         }
     }
 }

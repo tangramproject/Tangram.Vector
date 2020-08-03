@@ -20,12 +20,12 @@ namespace TGMCore.Providers
         public SipActorProvider(ActorSystem actorSystem, IUnitOfWork unitOfWork,
             IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
             IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider,
-            IPublisherBaseGraphProvider publisherBaseGraphProvider, ILogger<SipActorProvider<TAttach>> logger)
+            IPubProvider pubProvider, ILogger<SipActorProvider<TAttach>> logger)
         {
             _logger = logger;
 
             var sipActorProps = SipActor<TAttach>
-                .Create(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, publisherBaseGraphProvider);
+                .Create(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, pubProvider);
 
             _actor = actorSystem.ActorOf(sipActorProps, "sip-actor");
         }

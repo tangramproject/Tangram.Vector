@@ -10,7 +10,7 @@ using TGMCore.Model;
 
 namespace TGMCore.Providers
 {
-    public class PublisherBaseGraphProvider<TAttach> : IPublisherBaseGraphProvider
+    public class PublisherBaseGraphProvider<TAttach> : IPubProvider
     {
         private readonly IActorRef _actor;
         private readonly ILogger _logger;
@@ -30,7 +30,7 @@ namespace TGMCore.Providers
         /// 
         /// </summary>
         /// <param name="message"></param>
-        public Task PublishAsync(PublishMessage message)
+        public Task PublishAsync(ChatMessage message)
         {
             _actor.Tell(message);
 

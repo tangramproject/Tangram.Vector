@@ -100,7 +100,7 @@ namespace TGMNode
             {
                 app.ApplicationServices.GetService<ActorSystem>();
                 app.ApplicationServices.GetService<ISipActorProvider>();
-                app.ApplicationServices.GetService<ISubscriberBaseGraphProvider>();
+                app.ApplicationServices.GetService<ISubProvider>();
             });
 
             lifetime.ApplicationStopping.Register(() =>

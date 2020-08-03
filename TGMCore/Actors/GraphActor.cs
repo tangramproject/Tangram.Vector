@@ -25,7 +25,7 @@ namespace TGMCore.Actors
         private readonly IInterpretActorProvider<TAttach> _interpretActorProvider;
         private readonly IProcessActorProvider<TAttach> _processActorProvider;
         private readonly ISigningActorProvider _signingActorProvider;
-        private readonly IPublisherBaseGraphProvider _publisherBaseGraphProvider;
+        private readonly IPubProvider _pubProvider;
         private readonly int _totalNodes;
         private readonly ILoggingAdapter _logger;
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
@@ -44,14 +44,14 @@ namespace TGMCore.Actors
         public GraphActor(IUnitOfWork unitOfWork,
             IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
             IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider,
-            IPublisherBaseGraphProvider publisherBaseGraphProvider)
+            IPubProvider pubProvider)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
             _interpretActorProvider = interpretActorProvider;
             _processActorProvider = processActorProvider;
             _signingActorProvider = signingActorProvider;
-            _publisherBaseGraphProvider = publisherBaseGraphProvider;
+            _pubProvider = pubProvider;
 
             _logger = Context.GetLogger();
 
@@ -107,7 +107,7 @@ namespace TGMCore.Actors
             }
 
             await InitializeBlocks(message);
-            await _publisherBaseGraphProvider.PublishAsync(PublishMessage.Empty());
+            await _pubProvider.PublishAsync(ChatMessage.Empty());
         }
 
         /// <summary>
@@ -514,7 +514,7 @@ namespace TGMCore.Actors
         /// <param name="signingActorProvider"></param>
         /// <returns></returns>
         public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPublisherBaseGraphProvider publisherBaseGraphProvider) =>
-            Props.Create(() => new GraphActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, publisherBaseGraphProvider));
+            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPubProvider pubProvider) =>
+            Props.Create(() => new GraphActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, pubProvider));
     }
 }

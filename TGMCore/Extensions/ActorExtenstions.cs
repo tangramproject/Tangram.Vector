@@ -99,7 +99,7 @@ namespace TGMCore.Extensions
                     sp.GetService<IInterpretActorProvider<TAttach>>(),
                     sp.GetService<IProcessActorProvider<TAttach>>(),
                     sp.GetService<ISigningActorProvider>(),
-                    sp.GetService<IPublisherBaseGraphProvider>(),
+                    sp.GetService<IPubProvider>(),
                     sp.GetService<ILogger<SipActorProvider<TAttach>>>()
                 );
 
@@ -162,7 +162,7 @@ namespace TGMCore.Extensions
         /// <returns></returns>
         public static IServiceCollection AddPublisherProvider<TAttach>(this IServiceCollection services, string topic = null)
         {
-            services.AddSingleton<IPublisherBaseGraphProvider, PublisherBaseGraphProvider<TAttach>>(sp =>
+            services.AddSingleton<IPubProvider, PublisherBaseGraphProvider<TAttach>>(sp =>
             {
                 var publisher = new PublisherBaseGraphProvider<TAttach>
                 (
@@ -190,7 +190,7 @@ namespace TGMCore.Extensions
         /// <returns></returns>
         public static IServiceCollection AddSubscriberProvider<TAttach>(this IServiceCollection services, string topic)
         {
-            services.AddSingleton<ISubscriberBaseGraphProvider, SubscriberBaseGraphProvider<TAttach>>(sp =>
+            services.AddSingleton<ISubProvider, SubscriberBaseGraphProvider<TAttach>>(sp =>
             {
                 var subscriber = new SubscriberBaseGraphProvider<TAttach>
                 (

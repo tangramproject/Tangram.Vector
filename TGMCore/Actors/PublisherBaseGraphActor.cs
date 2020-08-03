@@ -41,7 +41,7 @@ namespace TGMCore.Actors
 
             _mediator = DistributedPubSub.Get(Context.System).Mediator;
 
-            ReceiveAsync<PublishMessage>(async message => await Publish(message));
+            ReceiveAsync<ChatMessage>(async message => await Publish(message));
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace TGMCore.Actors
         /// </summary>
         /// <param name="topic"></param>
         /// <returns></returns>
-        private async Task Publish(PublishMessage message)
+        private async Task Publish(ChatMessage message)
         {
             SemaphoreSlim throttler = null;
 

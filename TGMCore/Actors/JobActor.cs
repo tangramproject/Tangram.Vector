@@ -18,18 +18,18 @@ namespace TGMCore.Actors
 {
     public class JobActor<TAttach> : ReceiveActor
     {
-        private readonly IUnitOfWork _unitOfWork;
         private readonly IClusterProvider _clusterProvider;
+        private readonly IPubProvider _pubProvider;
         private readonly ILoggingAdapter _logger;
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
 
         public byte[] Id { get; private set; }
 
-        public JobActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider)
+        public JobActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IPubProvider pubProvider)
         {
-            _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
+            _pubProvider = pubProvider;
             _logger = Context.GetLogger();
             _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             _jobRepository = unitOfWork.CreateJobOf<TAttach>();
@@ -71,11 +71,9 @@ namespace TGMCore.Actors
 
                     await _baseGraphRepository.Include(blocks, _clusterProvider.GetSelfUniqueAddress());
                     await AddOrUpdateJob(blockHashLookup);
+
+                    _pubProvider.Publish(ChatMessage.Empty());
                 }
-
-                await Sender.GracefulStop(TimeSpan.FromSeconds(5));
-
-                Context.Stop(Self);
             }
             catch (Exception ex)
             {
@@ -128,7 +126,7 @@ namespace TGMCore.Actors
                     Model = next,
                     ExpectedTotalNodes = 4,
                     Node = _clusterProvider.GetSelfUniqueAddress(),
-                    TotalNodes = _clusterProvider.GetMembers().Count(),
+                    TotalNodes = _clusterProvider.AvailableMembersCount(),
                     Status = JobState.Started
                 };
 
@@ -277,8 +275,8 @@ namespace TGMCore.Actors
         /// <param name="unitOfWork"></param>
         /// <param name="clusterProvider"></param>
         /// <returns></returns>
-        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider) =>
-            Props.Create(() => new JobActor<TAttach>(unitOfWork, clusterProvider));
+        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IPubProvider pubProvider) =>
+            Props.Create(() => new JobActor<TAttach>(unitOfWork, clusterProvider, pubProvider));
 
     }
 }

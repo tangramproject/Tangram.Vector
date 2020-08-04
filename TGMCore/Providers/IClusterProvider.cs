@@ -12,5 +12,6 @@ namespace TGMCore.Providers
         ClusterEvent.CurrentClusterState GetCurrentClusterState();
         ulong GetSelfUniqueAddress();
         int GetInitialQuorumSize();
+        int AvailableMembersCount(string role = "");
     }
 }

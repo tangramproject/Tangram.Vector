@@ -1,6 +1,7 @@
 ﻿// TGMCore by Matthew Hellyer is licensed under CC BY-NC-ND 4.0.
 // To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-nd/4.0
 
+using System.Linq;
 using System.Collections.Generic;
 using Akka.Actor;
 using Akka.Cluster;
@@ -37,16 +38,19 @@ namespace TGMCore.Providers
         public IEnumerable<Member> GetMembers(string role = "")
         {
             var members = _cluster.State.GetMembers(role);
-            var unreachable = _cluster.State.GetUnreachableMembers(role);
-            int availableCount = members.Count - unreachable.Count;
-
-            return availableCount < _quorumSize
-                // too few available, down our partition
-                ? _cluster.State.GetMembers()
-                // enough available, down unreachable
-                : _cluster.State.GetUnreachableMembers();
+            return members.Where(x => x.UniqueAddress.Uid != _cluster.SelfUniqueAddress.Uid);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="role"></param>
+        /// <returns></returns>
+        public int AvailableMembersCount(string role = "")
+        {
+            var members = _cluster.State.GetMembers(role);
+             return members.Where(x => x.UniqueAddress.Uid != _cluster.SelfUniqueAddress.Uid).Count();
+        }
         /// <summary>
         /// 
         /// </summary>

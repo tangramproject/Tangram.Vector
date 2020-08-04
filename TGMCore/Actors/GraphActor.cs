@@ -37,14 +37,13 @@ namespace TGMCore.Actors
 
         private LastInterpretedMessage<TAttach> _lastInterpretedMessage;
         private IActorRef _jobActor;
-        private IActorRef _atLeastOnceDeliveryActor;
 
         public byte[] Id { get; private set; }
 
         public GraphActor(IUnitOfWork unitOfWork,
             IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider,
-            IPubProvider pubProvider)
+            IProcessActorProvider<TAttach> processActorProvider,
+            ISigningActorProvider signingActorProvider, IPubProvider pubProvider)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
@@ -52,9 +51,7 @@ namespace TGMCore.Actors
             _processActorProvider = processActorProvider;
             _signingActorProvider = signingActorProvider;
             _pubProvider = pubProvider;
-
             _logger = Context.GetLogger();
-
             _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             _jobRepository = unitOfWork.CreateJobOf<TAttach>();
             _baseBlockIDRepository = unitOfWork.CreateBaseBlockIDOf<TAttach>();
@@ -107,7 +104,6 @@ namespace TGMCore.Actors
             }
 
             await InitializeBlocks(message);
-            await _pubProvider.PublishAsync(ChatMessage.Empty());
         }
 
         /// <summary>
@@ -221,7 +217,7 @@ namespace TGMCore.Actors
             try
             {
                 var name = $"job-actor-{Util.HashToId(message.Hash.ToHex())}";
-                var jobActorProps = JobActor<TAttach>.Create(_unitOfWork, _clusterProvider);
+                var jobActorProps = JobActor<TAttach>.Create(_unitOfWork, _clusterProvider, _pubProvider);
 
                 actorRef = Context.System.ActorOf(jobActorProps, name);
             }

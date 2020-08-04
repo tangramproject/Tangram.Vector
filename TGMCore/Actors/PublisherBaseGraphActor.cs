@@ -35,8 +35,8 @@ namespace TGMCore.Actors
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
             _topic = topic;
-            _jobRepository = _unitOfWork.CreateJobOf<TAttach>();
-            _baseGraphRepository = _unitOfWork.CreateBaseGraphOf<TAttach>();
+            _jobRepository = unitOfWork.CreateJobOf<TAttach>();
+            _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
 
             _mediator = DistributedPubSub.Get(Context.System).Mediator;
 
@@ -54,6 +54,11 @@ namespace TGMCore.Actors
 
             try
             {
+                if (_clusterProvider.AvailableMembersCount() == 0)
+                {
+                    return;
+                }
+
                 var blockGraphs = await _baseGraphRepository
                     .GetWhere(x => x.Block.Node == _clusterProvider.GetSelfUniqueAddress() && x.Included && !x.Replied);
 

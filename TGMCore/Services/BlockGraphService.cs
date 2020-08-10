@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using TGMCore.Providers;
 using TGMCore.Extentions;
-using TGMCore.Helper;
 using TGMCore.Messages;
 using TGMCore.Model;
 using Microsoft.Extensions.Logging;
@@ -15,20 +14,15 @@ namespace TGMCore.Services
 {
     public class BlockGraphService<TAttach> : IBlockGraphService<TAttach>
     {
-        private static readonly AsyncLock _setBlockGraphMutex = new AsyncLock();
-
         private readonly ISipActorProvider _sipActorProvider;
-        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger _logger;
-        private readonly IBaseGraphRepository<TAttach> baseGraphRepository;
+        private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
 
         public BlockGraphService(ISipActorProvider sipActorProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphService<TAttach>> logger)
         {
             _sipActorProvider = sipActorProvider;
-            _unitOfWork = unitOfWork;
+            _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             _logger = logger;
-
-            baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
         }
 
         /// <summary>
@@ -39,45 +33,41 @@ namespace TGMCore.Services
         public async Task<BaseGraphProto<TAttach>> SetBlockGraph(BaseGraphProto<TAttach> blockGraph)
         {
             if (blockGraph == null)
-                throw new ArgumentNullException(nameof(blockGraph));
+                return null;
 
-            using (await _setBlockGraphMutex.LockAsync())
+            BaseGraphProto<TAttach> stored = null;
+
+            try
             {
-                try
+                var can = await _baseGraphRepository.CanAdd(blockGraph, blockGraph.Block.Node);
+                if (can == null)
                 {
-                    var can = await baseGraphRepository.CanAdd(blockGraph, blockGraph.Block.Node);
-                    if (can == null)
-                    {
-                        return blockGraph;
-                    }
-
-
-                    var stored = await baseGraphRepository.StoreOrUpdate(new BaseGraphProto<TAttach>
-                    {
-                        Block = blockGraph.Block,
-                        Deps = blockGraph.Deps?.Select(d => d).ToList(),
-                        Prev = blockGraph.Prev ?? null,
-                        Included = blockGraph.Included,
-                        Replied = blockGraph.Replied
-                    });
-
-                    if (stored == null)
-                    {
-                        _logger.LogError($"<<< BlockGraphService.SetBlockGraph >>>: Unable to save block {blockGraph.Block.Hash} for round {blockGraph.Block.Round} and node {blockGraph.Block.Node}");
-                        return null;
-                    }
-
-                    _sipActorProvider.Register(new HashedMessage(stored.Block.Hash.FromHex()));
-
-                    return stored;
+                    return blockGraph;
                 }
-                catch (Exception ex)
+
+                stored = await _baseGraphRepository.StoreOrUpdate(new BaseGraphProto<TAttach>
                 {
-                    _logger.LogError($"<<< BlockGraphService.SetBlockGraph >>>: {ex.ToString()}");
+                    Block = blockGraph.Block,
+                    Deps = blockGraph.Deps?.Select(d => d).ToList(),
+                    Prev = blockGraph.Prev ?? null,
+                    Included = blockGraph.Included,
+                    Replied = blockGraph.Replied
+                });
+
+                if (stored == null)
+                {
+                    _logger.LogError($"<<< BlockGraphService.SetBlockGraph >>>: Unable to save block {blockGraph.Block.Hash} for round {blockGraph.Block.Round} and node {blockGraph.Block.Node}");
+                    return null;
                 }
+
+                _sipActorProvider.Register(new HashedMessage(stored.Block.Hash.FromHex()));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"<<< BlockGraphService.SetBlockGraph >>>: {ex}");
             }
 
-            return null;
+            return stored;
         }
     }
 }

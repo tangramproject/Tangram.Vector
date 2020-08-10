@@ -31,7 +31,7 @@ namespace TGMCore.Actors
                         for (int i = 0; i < blockGraphProtos.Count(); i++)
                         {
                             var added = await blockGraphService.SetBlockGraph(blockGraphProtos.ElementAt(i));
-                            if (added != null)
+                            if (added == null)
                             {
                                 _log.Error($"<<< SubscriberActor.ReceiveAsync >>>: " +
                                     $"Blockgraph: {blockGraphProtos.ElementAt(i).Block.Hash} was not add " +

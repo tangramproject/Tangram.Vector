@@ -50,7 +50,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.StoreOrUpdate >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.StoreOrUpdate >>>: {ex}");
             }
 
             return Task.FromResult<TValue>(default);
@@ -71,7 +71,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.LoadAll >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.LoadAll >>>: {ex}");
             }
 
             for (int i = 0, valuesCount = values.Count(); i < valuesCount; i++)
@@ -96,7 +96,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.Load >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.Load >>>: {ex}");
             }
 
             return Task.FromResult(entity);
@@ -124,7 +124,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.Delete >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.Delete >>>: {ex}");
             }
 
             return Task.FromResult(result);
@@ -146,7 +146,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.GetFirstOrDefault >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.GetFirstOrDefault >>>: {ex}");
             }
 
             return Task.FromResult(entity);
@@ -168,7 +168,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.GetFirstOrDefault >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.GetLast(Expression<Func<TEntity, bool>> expression) >>>: {ex}");
             }
 
             return Task.FromResult(entity);
@@ -189,7 +189,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.GetLast >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.GetLast >>>: {ex}");
             }
 
             return Task.FromResult(entity);
@@ -211,7 +211,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.GetWhere >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.GetWhere >>>: {ex}");
             }
 
             return Task.FromResult(entities);
@@ -234,7 +234,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.GetRange >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.GetRange >>>: {ex}");
             }
 
             return Task.FromResult(entities);
@@ -258,7 +258,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< Repository.GetRange >>>: {ex.ToString()}");
+                logger.LogError($"<<< Repository.GetRange >>>: {ex}");
             }
 
             return Task.FromResult(entities);

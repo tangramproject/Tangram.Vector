@@ -158,23 +158,23 @@ namespace TGMCore.Actors
             if (string.IsNullOrEmpty(message.KeyPurpose))
                 throw new ArgumentNullException(nameof(message.Hash));
 
+            Models.SignedHashResponse signedHashResponse = null;
+
             try
             {
                 var keyPair = await CreateKeyPurpose(new KeyPurposeMessage(message.KeyPurpose));
-                var signedHashResponse = new Models.SignedHashResponse
+                signedHashResponse = new Models.SignedHashResponse
                 {
                     PublicKey = keyPair.PublicKey.FromHex(),
                     Signature = Curve.calculateSignature(Curve.decodePrivatePoint(keyPair.SecretKey.FromHex()), message.Hash)
                 };
-
-                return signedHashResponse;
             }
             catch (Exception ex)
             {
                 _logger.Error($"<<< SigningActor.Sign >>>: {ex}");
             }
 
-            return null;
+            return signedHashResponse;
         }
 
         /// <summary>

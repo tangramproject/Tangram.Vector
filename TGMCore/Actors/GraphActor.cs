@@ -31,7 +31,7 @@ namespace TGMCore.Actors
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
         private readonly IBaseBlockIDRepository<TAttach> _baseBlockIDRepository;
-        
+
         private Graph Graph;
         private Config Config;
 
@@ -90,7 +90,7 @@ namespace TGMCore.Actors
                 return;
             }
 
-            _ = await _signingActorProvider.CreateKeyPurpose(new KeyPurposeMessage(_keyPurpose));
+            await _signingActorProvider.CreateKeyPurpose(new KeyPurposeMessage(_keyPurpose));
             var lastInterpreted = await LastInterpreted(message);
 
             if (Graph == null)
@@ -122,7 +122,16 @@ namespace TGMCore.Actors
             if (message.Hash.Length != 33)
                 throw new ArgumentOutOfRangeException(nameof(message.Hash));
 
-            var blockID = await _baseBlockIDRepository.GetLast(x => x.Hash == message.Hash.ToHex());
+            BaseBlockIDProto<TAttach> blockID = null;
+
+            try
+            {
+                blockID = await _baseBlockIDRepository.GetLast(x => x.Hash == message.Hash.ToHex());
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"<<< GraphActor.LastInterpreted >>>: {ex}");
+            }
 
             _lastInterpretedMessage = blockID switch
             {
@@ -172,8 +181,8 @@ namespace TGMCore.Actors
             var blockGraphs = await _baseGraphRepository.GetWhere(x => x.Block.Hash == message.Hash.ToHex() && !x.Included && !x.Replied);
             foreach (var blockGraph in blockGraphs)
             {
-                var isSet = await SetOwnBlockGraph(blockGraph);
-                if (isSet == null)
+                var ownBlockGraph = await SetOwnBlockGraph(blockGraph);
+                if (ownBlockGraph == null)
                 {
                     _logger.Warning($"<<< GraphActor.InitializeBlocks >>>: " +
                         $"Unable to set own block Hash: {blockGraph.Block.Hash} Round: {blockGraph.Block.Round} from node {blockGraph.Block.Node}");
@@ -192,7 +201,7 @@ namespace TGMCore.Actors
 
                 _jobActor.Tell(message);
 
-                await Process(new ProcessBlockMessage<TAttach>(isSet));
+                await Process(new ProcessBlockMessage<TAttach>(ownBlockGraph));
             }
         }
 
@@ -337,36 +346,43 @@ namespace TGMCore.Actors
         private async Task<BaseGraphProto<TAttach>> SetOwnBlockGraph(BaseGraphProto<TAttach> blockGraph)
         {
             if (blockGraph == null)
-                throw new ArgumentNullException(nameof(blockGraph));
+                return null;
+
+            BaseGraphProto<TAttach> stored = null;
 
             try
             {
                 bool copy = false;
-                ulong round = 0;
-                ulong node = 0;
+                ulong round = 0, node = 0;
 
                 copy |= blockGraph.Block.Node != _clusterProvider.GetSelfUniqueAddress();
 
+                if (!copy)
+                    return null;
+
                 if (copy)
                 {
-                    node = blockGraph.Block.Node;
-                    round = blockGraph.Block.Round;
+                    try
+                    {
+                        round = await IncrementRound(blockGraph.Block.Hash);
+                        node = _clusterProvider.GetSelfUniqueAddress();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"<<< GraphActor.SetOwnBlockGraph ->  IncrementRound >>>: {ex}");
+                    }
                 }
 
-                if (!copy)
+                var prev = await _baseGraphRepository.GetPrevious(blockGraph.Block.Hash, node, round);
+                if (prev != null)
                 {
-                    round = await IncrementRound(blockGraph.Block.Hash);
-                    node = _clusterProvider.GetSelfUniqueAddress();
+                    blockGraph.Block.PreviousHash = prev.Block.Hash;
+
+                    if (prev.Block.Round + 1 != blockGraph.Block.Round)
+                        blockGraph.Prev = prev.Block;
                 }
 
                 var signed = await Sign(node, round, blockGraph);
-                var prev = await _baseGraphRepository.GetPrevious(signed.Block.Hash, node, round);
-
-                if (prev != null)
-                {
-                    if (prev.Block.Round + 1 != signed.Block.Round)
-                        signed.Prev = prev.Block;
-                }
 
                 round = GetLatestRound();
 
@@ -375,18 +391,14 @@ namespace TGMCore.Actors
                     return null;
                 }
 
-                var stored = await SetBlockGraph(signed);
-                if (stored != null)
-                {
-                    return stored;
-                }
+                stored = await SetBlockGraph(signed);
             }
             catch (Exception ex)
             {
                 _logger.Error($"<<< GraphActor.SetOwnBlockGraph >>>: {ex}");
             }
 
-            return null;
+            return stored;
         }
 
         /// <summary>
@@ -428,7 +440,9 @@ namespace TGMCore.Actors
         private async Task<BaseGraphProto<TAttach>> SetBlockGraph(BaseGraphProto<TAttach> blockGraph)
         {
             if (blockGraph == null)
-                throw new ArgumentNullException(nameof(blockGraph));
+                return null;
+
+            BaseGraphProto<TAttach> stored = null;
 
             try
             {
@@ -438,7 +452,7 @@ namespace TGMCore.Actors
                     return null;
                 }
 
-                var stored = await _baseGraphRepository.StoreOrUpdate(new BaseGraphProto<TAttach>
+                stored = await _baseGraphRepository.StoreOrUpdate(new BaseGraphProto<TAttach>
                 {
                     Block = blockGraph.Block,
                     Deps = blockGraph.Deps?.Select(d => d).ToList(),
@@ -446,16 +460,13 @@ namespace TGMCore.Actors
                     Included = blockGraph.Included,
                     Replied = blockGraph.Replied
                 });
-
-                return stored;
-
             }
             catch (Exception ex)
             {
                 _logger.Error($"<<< GraphActor.SetBlockGraph >>>: {ex}");
             }
 
-            return null;
+            return stored;
         }
 
         /// <summary>

@@ -14,7 +14,7 @@
 *.rhp
 *.rol
 *.dll
-
+*.xml
 *.pdb
 
 # Build results

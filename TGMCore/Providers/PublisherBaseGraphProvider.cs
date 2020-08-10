@@ -14,9 +14,7 @@ namespace TGMCore.Providers
         private readonly IActorRef _actor;
         private readonly ILogger _logger;
 
-        public PublisherBaseGraphProvider(ActorSystem actorSystem, IUnitOfWork unitOfWork, IClusterProvider clusterProvider,
-            IBaseGraphRepository<TAttach> baseGraphRepository, IJobRepository<TAttach> jobRepository,
-            ILogger<PublisherBaseGraphProvider<TAttach>> logger, string topic = null)
+        public PublisherBaseGraphProvider(ActorSystem actorSystem, IUnitOfWork unitOfWork, IClusterProvider clusterProvider, ILogger<PublisherBaseGraphProvider<TAttach>> logger, string topic = null)
         {
             _logger = logger;
 

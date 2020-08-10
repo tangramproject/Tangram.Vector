@@ -1,4 +1,14 @@
 ﻿ akka {
+        actor {
+            serializers {
+                json = "Akka.Serialization.NewtonSoftJsonSerializer"
+                bytes = "Akka.Serialization.ByteArraySerializer"
+            }
+            serialization-bindings {
+              "System.Byte[]" = bytes
+              "System.Object" = json
+            }
+        }
         loggers = ["Akka.Logger.Serilog.SerilogLogger, Akka.Logger.Serilog"]
         actor.provider = "Akka.Cluster.ClusterActorRefProvider, Akka.Cluster"
         remote {
@@ -8,7 +18,7 @@
                 dns-use-ipv6 = false
                 enforce-ip-family = true
                 hostname = "0.0.0.0"   
-                port = 7001
+                port = 8001
             }
         }
         cluster {
@@ -36,7 +46,7 @@
                 }
             }
             auto-down-unreachable-after = off
-            seed-nodes = ["akka.tcp://tangram-system@0.0.0.0:7001", "akka.tcp://tangram-system@0.0.0.0:6001"]
+            seed-nodes = ["akka.tcp://tangram-system@0.0.0.0:8001", "akka.tcp://tangram-system@0.0.0.0:6001"]
             roles : []
         }
         # Settings for the DistributedPubSub extension

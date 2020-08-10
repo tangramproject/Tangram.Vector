@@ -6,6 +6,10 @@ using TGMCore.Model;
 using TGMCore.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
+using Autofac.Extensions.DependencyInjection;
+using Autofac;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.Extensions.Options;
 
 namespace TGMCore.Extensions
 {
@@ -15,12 +19,12 @@ namespace TGMCore.Extensions
         /// 
         /// </summary>
         /// <typeparam name="TAttach"></typeparam>
-        /// <param name="services"></param>
+        /// <param name="builder"></param>
         /// <returns></returns>
-        public static IServiceCollection AddBlockGraphService<TAttach>(this IServiceCollection services)
+        public static ContainerBuilder AddBlockGraphService<TAttach>(this ContainerBuilder builder)
         {
-            services.AddTransient<IBlockGraphService<TAttach>, BlockGraphService<TAttach>>();
-            return services;
+            builder.RegisterType<BlockGraphService<TAttach>>().As<IBlockGraphService<TAttach>>();
+            return builder;
         }
 
         /// <summary>
@@ -51,12 +55,23 @@ namespace TGMCore.Extensions
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="builder"></param>
         /// <returns></returns>
-        public static IServiceCollection AddDbContext(this IServiceCollection services)
+        public static ContainerBuilder AddDbContext(this ContainerBuilder builder)
         {
-            services.AddSingleton<IDbContext, DbContext>();
-            return services;
+            builder.RegisterType<DbContext>().As<IDbContext>().SingleInstance();
+            return builder;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <returns></returns>
+        public static ContainerBuilder AddUnitOfWork(this ContainerBuilder builder)
+        {
+            builder.RegisterType<UnitOfWork>().As<IUnitOfWork>().SingleInstance();
+            return builder;
         }
 
         /// <summary>
@@ -64,18 +79,7 @@ namespace TGMCore.Extensions
         /// </summary>
         /// <param name="services"></param>
         /// <returns></returns>
-        public static IServiceCollection AddUnitOfWork(this IServiceCollection services)
-        {
-            services.AddSingleton<IUnitOfWork, UnitOfWork>();
-            return services;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="services"></param>
-        /// <returns></returns>
-        public static IServiceCollection AddDataKeysProtection(this IServiceCollection services)
+        public static IServiceCollection AddDataKeysProtection(this IServiceCollection services, string path)
         {
             services.AddSingleton<IDataProtectionKeyRepository, DataProtectionKeyRepository>(sp =>
             {
@@ -85,11 +89,28 @@ namespace TGMCore.Extensions
 
             services
                 .AddDataProtection()
-                .AddKeyManagementOptions(options => options.XmlRepository = services.BuildServiceProvider().GetService<IDataProtectionKeyRepository>())
+                .PersistKeysToFileSystem(new System.IO.DirectoryInfo(path))
                 .SetApplicationName("tangram")
                 .SetDefaultKeyLifetime(TimeSpan.FromDays(7));
 
             return services;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <returns></returns>
+        public static ContainerBuilder AddDataKeysProtection(this ContainerBuilder builder)
+        {
+            builder.Register(c =>
+            {
+                var dataProtectionKeyRepository = new DataProtectionKeyRepository(c.Resolve<IDbContext>());
+                return dataProtectionKeyRepository;
+            })
+            .As<IDataProtectionKeyRepository>();
+
+            return builder;
         }
     }
 }

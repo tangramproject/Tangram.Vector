@@ -1,12 +1,10 @@
 ﻿// TGMNode by Matthew Hellyer is licensed under CC BY-NC-ND 4.0.
 // To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-nd/4.0
 
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System.Diagnostics;
 using Akka.Actor;
 using Microsoft.Extensions.Hosting;
 using TGMNode.StartupExtensions;
@@ -15,26 +13,28 @@ using TGMNode.Actors;
 using TGMCore.Providers;
 using TGMCore.Consensus;
 using TGMCore.Extensions;
+using Autofac.Extensions.DependencyInjection;
+using Autofac;
+using Microsoft.AspNetCore.Hosting;
 
 namespace TGMNode
 {
     public class Startup
     {
-        public IConfiguration Configuration { get; }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="configuration"></param>
-        public Startup(IConfiguration configuration)
+        public Startup(IWebHostEnvironment env)
         {
-            Configuration = configuration;
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(env.ContentRootPath)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
+                .AddEnvironmentVariables();
 
-            AppDomain.CurrentDomain.FirstChanceException += (sender, eventArgs) =>
-            {
-                Debug.WriteLine(eventArgs.Exception.ToString());
-            };
+            Configuration = builder.Build();
         }
+
+        public IConfigurationRoot Configuration { get; private set; }
+
+        public ILifetimeScope AutofacContainer { get; private set; }
 
         /// <summary>
         /// 
@@ -42,7 +42,7 @@ namespace TGMNode
         /// <param name="services"></param>
         public void ConfigureServices(IServiceCollection services)
         {
-            var gatewaySection = Configuration.GetSection("Gateway");
+            var dataProtecttion = Configuration.GetSection("DataProtectionPath");
 
             services.AddResponseCompression();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
@@ -52,20 +52,29 @@ namespace TGMNode
             services.AddHttpContextAccessor();
             services.AddOptions();
             services.Configure<BlockmainiaOptions>(Configuration);
-            services.AddDbContext();
-            services.AddUnitOfWork();
-            services.AddDataKeysProtection();
-            services.AddActorSystem("tangram-system", "tgmnode.hocon");
-            services.AddSigningActorProvider();
-            services.AddInterpretActorProvider<TransactionProto>(InterpretBlockActor.Create);
-            services.AddProcessActorProvider<TransactionProto>();
-            services.AddSipActorProvider<Startup, TransactionProto>();
-            services.AddBlockGraphService<TransactionProto>();
-            services.AddTransactionService();
-            services.AddVerifiableFunctionsActorProvider();
-            services.AddClusterProvider("tgmnode.hocon");
-            services.AddPublisherProvider<TransactionProto>("blockgraph");
-            services.AddSubscriberProvider<TransactionProto>("blockgraph");
+            services.AddDataKeysProtection(dataProtecttion.Value);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="builder"></param>
+        public void ConfigureContainer(ContainerBuilder builder)
+        {
+            builder.AddDbContext();
+            builder.AddUnitOfWork();
+            builder.AddActorSystem("tangram-system", "tgmnode.hocon");
+            builder.AddSigningActorProvider();
+            builder.AddInterpretActorProvider<TransactionProto>(InterpretBlockActor.Create);
+            builder.AddProcessActorProvider<TransactionProto>();
+            builder.AddSipActorProvider<Startup, TransactionProto>();
+            builder.AddBlockGraphService<TransactionProto>();
+            builder.AddTransactionService();
+            builder.AddVerifiableFunctionsActorProvider();
+            builder.AddClusterProvider("tgmnode.hocon");
+            builder.AddPublisherProvider<TransactionProto>("blockgraph");
+            builder.AddSubscriberProvider<TransactionProto>("blockgraph");
+            builder.AddDataKeysProtection();
         }
 
         /// <summary>
@@ -96,17 +105,22 @@ namespace TGMNode
                    c.OAuthAppName("TGMNode Swagger UI");
                });
 
+            AutofacContainer = app.ApplicationServices.GetAutofacRoot();
+            AutofacContainer.Resolve<ActorSystem>().UseAutofac(AutofacContainer);
+
             lifetime.ApplicationStarted.Register(() =>
             {
-                app.ApplicationServices.GetService<ActorSystem>();
-                app.ApplicationServices.GetService<ISipActorProvider>();
-                app.ApplicationServices.GetService<ISubProvider>();
+                AutofacContainer.Resolve<ActorSystem>();
+                AutofacContainer.Resolve<ISipActorProvider>();
+                AutofacContainer.Resolve<ISubProvider>();
             });
 
             lifetime.ApplicationStopping.Register(() =>
             {
-                app.ApplicationServices.GetService<ActorSystem>().Terminate().Wait();
+                AutofacContainer.Resolve<ActorSystem>().Terminate().Wait();
             });
+
+
         }
     }
 }

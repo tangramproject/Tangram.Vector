@@ -2,7 +2,7 @@
 // To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-nd/4.0
 
 using TGMNode.Services;
-using Microsoft.Extensions.DependencyInjection;
+using Autofac;
 
 namespace TGMNode.StartupExtensions
 {
@@ -11,12 +11,12 @@ namespace TGMNode.StartupExtensions
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="builder"></param>
         /// <returns></returns>
-        public static IServiceCollection AddTransactionService(this IServiceCollection services)
+        public static ContainerBuilder AddTransactionService(this ContainerBuilder builder)
         {
-            services.AddTransient<ITransactionService, TransactionService>();
-            return services;
+            builder.RegisterType<TransactionService>().As<ITransactionService>();
+            return builder;
         }
     }
 }

@@ -8,202 +8,216 @@ using TGMCore.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Akka.Configuration;
+using Autofac;
+using Akka.DI.AutoFac;
 
 namespace TGMCore.Extensions
 {
     public static class ActorExtenstions
     {
+
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="container"></param>
         /// <param name="name"></param>
+        /// <param name="configFile"></param>
         /// <returns></returns>
-        public static IServiceCollection AddActorSystem(this IServiceCollection services, string name, string configFile)
+        public static ContainerBuilder AddActorSystem(this ContainerBuilder builder, string name, string configFile)
         {
             var config = Helper.ConfigurationLoader.Load(configFile).WithFallback(ConfigurationFactory.Default());
-            var actorSystem = ActorSystem.Create(name, config);
+            builder.Register(c =>
+            {
+                var actorSystem = ActorSystem.Create(name, config);
+                return actorSystem;
+            })
+            .SingleInstance();
 
-            services.AddSingleton(typeof(ActorSystem), (serviceProvider) => actorSystem);
-            return services;
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="containerBuilder"></param>
         /// <returns></returns>
-        public static IServiceCollection AddSigningActorProvider(this IServiceCollection services)
+        public static ContainerBuilder AddSigningActorProvider(this ContainerBuilder builder)
         {
-            services.AddSingleton<ISigningActorProvider, SigningActorProvider>();
-            return services;
+            builder.RegisterType<SigningActorProvider>().As<ISigningActorProvider>().SingleInstance();
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="builder"></param>
+        /// <param name="invoker"></param>
         /// <returns></returns>
-        public static IServiceCollection AddInterpretActorProvider<TAttach>(this IServiceCollection services, Func<IUnitOfWork, ISigningActorProvider, Props> invoker)
+        public static ContainerBuilder AddInterpretActorProvider<TAttach>(this ContainerBuilder builder, Func<IUnitOfWork, ISigningActorProvider, Props> invoker)
         {
-            services.AddSingleton<IInterpretActorProvider<TAttach>, InterpretActorProvider<TAttach>>(sp =>
+            builder.Register(c =>
             {
                 var interpretActorProvider = new InterpretActorProvider<TAttach>(
-                    sp.GetService<ActorSystem>(),
+                    c.Resolve<ActorSystem>(),
                     invoker,
-                    sp.GetService<IUnitOfWork>(),
-                    sp.GetService<ISigningActorProvider>(),
-                    sp.GetService<ILogger<InterpretActorProvider<TAttach>>>());
+                    c.Resolve<IUnitOfWork>(),
+                    c.Resolve<ISigningActorProvider>(),
+                    c.Resolve<ILogger<InterpretActorProvider<TAttach>>>());
 
                 return interpretActorProvider;
 
-            });
+            })
+            .As<IInterpretActorProvider<TAttach>>()
+            .SingleInstance();
 
-            return services;
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="builder"></param>
         /// <returns></returns>
-        public static IServiceCollection AddProcessActorProvider<TAttach>(this IServiceCollection services)
+        public static ContainerBuilder AddProcessActorProvider<TAttach>(this ContainerBuilder builder)
         {
-            services.AddSingleton<IProcessActorProvider<TAttach>, ProcessActorProvider<TAttach>>();
-            return services;
+            builder.RegisterType<ProcessActorProvider<TAttach>>().As<IProcessActorProvider<TAttach>>().SingleInstance();
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <typeparam name="Startup"></typeparam>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="builder"></param>
         /// <returns></returns>
-        public static IServiceCollection AddSipActorProvider<Startup, TAttach>(this IServiceCollection services)
+        public static ContainerBuilder AddSipActorProvider<Startup, TAttach>(this ContainerBuilder builder)
         {
-            services.AddSingleton<ISipActorProvider, SipActorProvider<TAttach>>(sp =>
+            builder.Register(c =>
             {
-                var logger = sp.GetService<ILogger<Startup>>();
-                //var syncProvider = sp.GetService<SyncProvider<TAttach>>();
-
-                //while (syncProvider.IsRunning)
-                //{
-                //    logger.LogInformation("Syncing node... retrying in a few seconds");
-                //    Thread.Sleep(5000);
-                //}
-
                 var sipActorProvider = new SipActorProvider<TAttach>
                 (
-                    sp.GetService<ActorSystem>(),
-                    sp.GetService<IUnitOfWork>(),
-                    sp.GetService<IClusterProvider>(),
-                    sp.GetService<IInterpretActorProvider<TAttach>>(),
-                    sp.GetService<IProcessActorProvider<TAttach>>(),
-                    sp.GetService<ISigningActorProvider>(),
-                    sp.GetService<IPubProvider>(),
-                    sp.GetService<ILogger<SipActorProvider<TAttach>>>()
+                    c.Resolve<ActorSystem>(),
+                    c.Resolve<IUnitOfWork>(),
+                    c.Resolve<IClusterProvider>(),
+                    c.Resolve<IInterpretActorProvider<TAttach>>(),
+                    c.Resolve<IProcessActorProvider<TAttach>>(),
+                    c.Resolve<ISigningActorProvider>(),
+                    c.Resolve<IPubProvider>(),
+                    c.Resolve<ILogger<SipActorProvider<TAttach>>>()
                 );
 
                 return sipActorProvider;
+            })
+            .As<ISipActorProvider>()
+            .SingleInstance();
 
-            });
-
-            return services;
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="builder"></param>
         /// <returns></returns>
-        public static IServiceCollection AddVerifiableFunctionsActorProvider(this IServiceCollection services)
+        public static ContainerBuilder AddVerifiableFunctionsActorProvider(this ContainerBuilder builder)
         {
-            services.AddSingleton<IVerifiableFunctionsActorProvider, VerifiableFunctionsActorProvider>(sp =>
+            builder.Register(c =>
             {
                 var verifiableFunctionsActorProvider = new VerifiableFunctionsActorProvider
                 (
-                    sp.GetService<ActorSystem>(),
-                    sp.GetService<ISigningActorProvider>()
+                    c.Resolve<ActorSystem>(),
+                    c.Resolve<ISigningActorProvider>()
                 );
 
                 return verifiableFunctionsActorProvider;
-            });
+            })
+            .As<IVerifiableFunctionsActorProvider>()
+            .SingleInstance();
 
-            return services;
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="builder"></param>
+        /// <param name="configFile"></param>
         /// <returns></returns>
-        public static IServiceCollection AddClusterProvider(this IServiceCollection services, string configFile)
+        public static ContainerBuilder AddClusterProvider(this ContainerBuilder builder, string configFile)
         {
-            services.AddSingleton<IClusterProvider, ClusterProvider>(sp =>
+            builder.Register(c =>
             {
                 var config = Helper.ConfigurationLoader.Load(configFile);
                 var cluserProvider = new ClusterProvider
                 (
-                     sp.GetService<ActorSystem>(),
+                     c.Resolve<ActorSystem>(),
                      config
                 );
 
                 return cluserProvider;
-            });
+            })
+            .As<IClusterProvider>()
+            .SingleInstance();
 
-            return services;
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
         /// <typeparam name="TAttach"></typeparam>
-        /// <param name="services"></param>
+        /// <param name="builder"></param>
         /// <param name="topic"></param>
         /// <returns></returns>
-        public static IServiceCollection AddPublisherProvider<TAttach>(this IServiceCollection services, string topic = null)
+        public static ContainerBuilder AddPublisherProvider<TAttach>(this ContainerBuilder builder, string topic = null)
         {
-            services.AddSingleton<IPubProvider, PublisherBaseGraphProvider<TAttach>>(sp =>
+            builder.Register(c =>
             {
                 var publisher = new PublisherBaseGraphProvider<TAttach>
                 (
-                    sp.GetService<ActorSystem>(),
-                    sp.GetService<IUnitOfWork>(),
-                    sp.GetService<IClusterProvider>(),
-                    sp.GetService<IBaseGraphRepository<TAttach>>(),
-                    sp.GetService<IJobRepository<TAttach>>(),
-                    sp.GetService<ILogger<PublisherBaseGraphProvider<TAttach>>>(),
+                    c.Resolve<ActorSystem>(),
+                    c.Resolve<IUnitOfWork>(),
+                    c.Resolve<IClusterProvider>(),
+                    c.Resolve<ILogger<PublisherBaseGraphProvider<TAttach>>>(),
                     topic
                 );
 
                 return publisher;
-            });
+            })
+            .As<IPubProvider>()
+            .SingleInstance();
 
-            return services;
+            return builder;
         }
 
         /// <summary>
         /// 
         /// </summary>
         /// <typeparam name="TAttach"></typeparam>
-        /// <param name="services"></param>
+        /// <param name="builder"></param>
         /// <param name="topic"></param>
         /// <returns></returns>
-        public static IServiceCollection AddSubscriberProvider<TAttach>(this IServiceCollection services, string topic)
+        public static ContainerBuilder AddSubscriberProvider<TAttach>(this ContainerBuilder builder, string topic)
         {
-            services.AddSingleton<ISubProvider, SubscriberBaseGraphProvider<TAttach>>(sp =>
+            builder.Register(c =>
             {
                 var subscriber = new SubscriberBaseGraphProvider<TAttach>
                 (
-                     sp.GetService<ActorSystem>(),
+                     c.Resolve<ActorSystem>(),
                      topic,
-                     sp.GetService<Services.IBlockGraphService<TAttach>>(),
-                     sp.GetService<ILogger<SubscriberBaseGraphProvider<TAttach>>>()
+                     c.Resolve<Services.IBlockGraphService<TAttach>>(),
+                     c.Resolve<ILogger<SubscriberBaseGraphProvider<TAttach>>>()
                  );
 
                 return subscriber;
-            });
-            
-            return services;
+            })
+            .As<ISubProvider>()
+            .SingleInstance();
+
+            return builder;
         }
     }
 }

@@ -5,11 +5,12 @@ using System;
 using Akka.Actor;
 using TGMCore.Providers;
 using TGMCore.Model;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Akka.Configuration;
 using Autofac;
-using Akka.DI.AutoFac;
+using TGMCore.Actors;
+using Akka.Remote;
+using TGMCore.Services;
 
 namespace TGMCore.Extensions
 {
@@ -25,11 +26,12 @@ namespace TGMCore.Extensions
         /// <returns></returns>
         public static ContainerBuilder AddActorSystem(this ContainerBuilder builder, string name, string configFile)
         {
-            var config = Helper.ConfigurationLoader.Load(configFile).WithFallback(ConfigurationFactory.Default());
             builder.Register(c =>
             {
-                var actorSystem = ActorSystem.Create(name, config);
-                return actorSystem;
+                var actorService = c.Resolve<IActorService>();
+                actorService.Start(name, configFile);
+
+                return actorService.Get;
             })
             .SingleInstance();
 

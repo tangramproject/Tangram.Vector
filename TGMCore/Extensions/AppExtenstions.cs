@@ -30,6 +30,18 @@ namespace TGMCore.Extensions
         /// <summary>
         /// 
         /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="builder"></param>
+        /// <returns></returns>
+        public static ContainerBuilder AddBActorService<TAttach>(this ContainerBuilder builder)
+        {
+            builder.RegisterType<ActorService>().As<IActorService>().SingleInstance();
+            return builder;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="services"></param>
         /// <returns></returns>
         //public static IServiceCollection AddSyncProvider<TAttach>(this IServiceCollection services, string route)

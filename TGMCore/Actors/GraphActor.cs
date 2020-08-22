@@ -20,37 +20,32 @@ namespace TGMCore.Actors
     {
         private const string _keyPurpose = "GraphActor.Key";
 
-        private readonly IUnitOfWork _unitOfWork;
         private readonly IClusterProvider _clusterProvider;
         private readonly IInterpretActorProvider<TAttach> _interpretActorProvider;
         private readonly IProcessActorProvider<TAttach> _processActorProvider;
         private readonly ISigningActorProvider _signingActorProvider;
-        private readonly IPubProvider _pubProvider;
         private readonly int _totalNodes;
         private readonly ILoggingAdapter _logger;
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
         private readonly IBaseBlockIDRepository<TAttach> _baseBlockIDRepository;
+        private readonly IJobActorProvider<TAttach> _jobActorProvider;
 
         private Graph Graph;
         private Config Config;
 
         private LastInterpretedMessage<TAttach> _lastInterpretedMessage;
-        private IActorRef _jobActor;
 
         public byte[] Id { get; private set; }
 
-        public GraphActor(IUnitOfWork unitOfWork,
-            IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-            IProcessActorProvider<TAttach> processActorProvider,
-            ISigningActorProvider signingActorProvider, IPubProvider pubProvider)
+        public GraphActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
+            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IJobActorProvider<TAttach> jobActorProvider)
         {
-            _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
             _interpretActorProvider = interpretActorProvider;
             _processActorProvider = processActorProvider;
             _signingActorProvider = signingActorProvider;
-            _pubProvider = pubProvider;
+            _jobActorProvider = jobActorProvider;
             _logger = Context.GetLogger();
             _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             _jobRepository = unitOfWork.CreateJobOf<TAttach>();
@@ -64,6 +59,21 @@ namespace TGMCore.Actors
 
             ReceiveAsync<HashedMessage>(async message => await Register(message));
             ReceiveAsync<ProcessBlockMessage<TAttach>>(async message => await Process(message));
+        }
+
+        protected override SupervisorStrategy SupervisorStrategy()
+        {
+            return new OneForOneStrategy(e =>
+            {
+                if (e is NotSupportedException)
+                {
+                    return Directive.Resume;
+                }
+                else
+                {
+                    return Directive.Restart;
+                }
+            });
         }
 
         /// <summary>
@@ -86,7 +96,7 @@ namespace TGMCore.Actors
 
             if (!Id.SequenceEqual(message.Hash))
             {
-                Shutdown(message, $"<<< GraphActor.Register >>>: Received hash mismatch. Got: ({message.Hash}) Expected: ({Id})");
+                _logger.Error($"<<< GraphActor.Register >>>: Received hash mismatch. Got: ({message.Hash}) Expected: ({Id})");
                 return;
             }
 
@@ -95,8 +105,6 @@ namespace TGMCore.Actors
 
             if (Graph == null)
             {
-                _jobActor = CreateJob(message);
-
                 Config = new Config(lastInterpreted, new ulong[_totalNodes], _clusterProvider.GetSelfUniqueAddress(), (ulong)_totalNodes);
                 Graph = new Graph(Config);
 
@@ -145,27 +153,6 @@ namespace TGMCore.Actors
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="message"></param>
-        private void Shutdown(HashedMessage message, string reason)
-        {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
-
-            if (message.Hash == null)
-                throw new ArgumentNullException(nameof(message.Hash));
-
-            if (message.Hash.Length != 33)
-                throw new ArgumentOutOfRangeException(nameof(message.Hash));
-
-            if (string.IsNullOrEmpty(reason))
-                throw new ArgumentNullException(nameof(reason));
-
-            Sender.Tell(new GracefulStopMessge(message.Hash, new TimeSpan(1), reason));
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
         /// <returns></returns>
         private async Task InitializeBlocks(HashedMessage message)
         {
@@ -189,53 +176,10 @@ namespace TGMCore.Actors
                     continue;
                 }
 
-                if (string.IsNullOrEmpty(blockGraph.Block.SignedBlock.PublicKey) || string.IsNullOrEmpty(blockGraph.Block.SignedBlock.Signature))
-                {
-                    var success = await _baseGraphRepository.Delete(blockGraph.Id);
-                    if (!success)
-                    {
-                        _logger.Error($"<<< GraphActor.InitializeBlocks >>>: Failed to delete block {blockGraph.Block.Hash}");
-                        continue;
-                    }
-                }
-
-                _jobActor.Tell(message);
+                _jobActorProvider.Register(message);
 
                 await Process(new ProcessBlockMessage<TAttach>(ownBlockGraph));
             }
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns></returns>
-        private IActorRef CreateJob(HashedMessage message)
-        {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
-
-            if (message.Hash == null)
-                throw new ArgumentNullException(nameof(message.Hash));
-
-            if (message.Hash.Length != 33)
-                throw new ArgumentOutOfRangeException(nameof(message.Hash));
-
-            IActorRef actorRef = null;
-
-            try
-            {
-                var name = $"job-actor-{Util.HashToId(message.Hash.ToHex())}";
-                var jobActorProps = JobActor<TAttach>.Create(_unitOfWork, _clusterProvider, _pubProvider);
-
-                actorRef = Context.System.ActorOf(jobActorProps, name);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"<<< GraphActor.CreateJob >>>: {ex}");
-            }
-
-            return actorRef;
         }
 
         /// <summary>
@@ -358,7 +302,10 @@ namespace TGMCore.Actors
                 copy |= blockGraph.Block.Node != _clusterProvider.GetSelfUniqueAddress();
 
                 if (!copy)
-                    return null;
+                {
+                    node = blockGraph.Block.Node;
+                    round = blockGraph.Block.Round;
+                }
 
                 if (copy)
                 {
@@ -391,7 +338,7 @@ namespace TGMCore.Actors
                     return null;
                 }
 
-                stored = await SetBlockGraph(signed);
+                stored = await StoreBlockGraph(signed, blockGraph);
             }
             catch (Exception ex)
             {
@@ -437,7 +384,7 @@ namespace TGMCore.Actors
         /// </summary>
         /// <param name="blockGraph"></param>
         /// <returns></returns>
-        private async Task<BaseGraphProto<TAttach>> SetBlockGraph(BaseGraphProto<TAttach> blockGraph)
+        private async Task<BaseGraphProto<TAttach>> StoreBlockGraph(BaseGraphProto<TAttach> signedBlockGraph, BaseGraphProto<TAttach> blockGraph)
         {
             if (blockGraph == null)
                 return null;
@@ -446,19 +393,26 @@ namespace TGMCore.Actors
 
             try
             {
-                var can = await _baseGraphRepository.CanAdd(blockGraph, blockGraph.Block.Node);
+                var can = await _baseGraphRepository.CanAdd(signedBlockGraph, signedBlockGraph.Block.Node);
                 if (can == null)
                 {
-                    return null;
+                    if (string.IsNullOrEmpty(blockGraph.Block.SignedBlock.PublicKey) && string.IsNullOrEmpty(blockGraph.Block.SignedBlock.Signature))
+                    {
+                        var success = await _baseGraphRepository.Delete(blockGraph.Id);
+                        if (!success)
+                        {
+                            _logger.Error($"<<< GraphActor.SetBlockGraph >>>: Failed to delete block {blockGraph.Block.Hash}");
+                        }
+                    }
                 }
 
                 stored = await _baseGraphRepository.StoreOrUpdate(new BaseGraphProto<TAttach>
                 {
-                    Block = blockGraph.Block,
-                    Deps = blockGraph.Deps?.Select(d => d).ToList(),
-                    Prev = blockGraph.Prev ?? null,
-                    Included = blockGraph.Included,
-                    Replied = blockGraph.Replied
+                    Block = signedBlockGraph.Block,
+                    Deps = signedBlockGraph.Deps?.Select(d => d).ToList(),
+                    Prev = signedBlockGraph.Prev ?? null,
+                    Included = signedBlockGraph.Included,
+                    Replied = signedBlockGraph.Replied
                 });
             }
             catch (Exception ex)
@@ -507,9 +461,10 @@ namespace TGMCore.Actors
         /// <param name="interpretActorProvider"></param>
         /// <param name="processActorProvider"></param>
         /// <param name="signingActorProvider"></param>
+        /// <param name="jobActorProvider"></param>
         /// <returns></returns>
         public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
-            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IPubProvider pubProvider) =>
-            Props.Create(() => new GraphActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, pubProvider));
+            IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider, IJobActorProvider<TAttach> jobActorProvider) =>
+            Props.Create(() => new GraphActor<TAttach>(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, jobActorProvider));
     }
 }

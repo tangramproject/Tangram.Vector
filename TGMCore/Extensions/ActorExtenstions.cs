@@ -1,4 +1,4 @@
-// TGMCore by Matthew Hellyer is licensed under CC BY-NC-ND 4.0.
+﻿// TGMCore by Matthew Hellyer is licensed under CC BY-NC-ND 4.0.
 // To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-nd/4.0
 
 using System;
@@ -196,21 +196,46 @@ namespace TGMCore.Extensions
         /// <param name="builder"></param>
         /// <param name="topic"></param>
         /// <returns></returns>
-        public static ContainerBuilder AddSubscriberProvider<TAttach>(this ContainerBuilder builder, string topic)
+        public static ContainerBuilder AddSubscriberBaseGraphProvider<TAttach>(this ContainerBuilder builder)
         {
             builder.Register(c =>
             {
                 var subscriber = new SubscriberBaseGraphProvider<TAttach>
                 (
-                     c.Resolve<ActorSystem>(),
-                     topic,
-                     c.Resolve<Services.IBlockGraphService<TAttach>>(),
+                     c.Resolve<IActorSystemService>(),
+                     c.Resolve<IBlockGraphService<TAttach>>(),
                      c.Resolve<ILogger<SubscriberBaseGraphProvider<TAttach>>>()
                  );
 
                 return subscriber;
             })
-            .As<ISubProvider>()
+            .As<ISubscriberBaseGraphProvider>()
+            .SingleInstance();
+
+            return builder;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TAttach"></typeparam>
+        /// <param name="builder"></param>
+        /// <returns></returns>
+        public static ContainerBuilder AddJobActorProvider<TAttach>(this ContainerBuilder builder)
+        {
+            builder.Register(c =>
+            {
+                var jobActorProvider = new JobActorProvider<TAttach>
+                (
+                    c.Resolve<IActorSystemService>(),
+                    c.Resolve<IUnitOfWork>(),
+                    c.Resolve<IClusterProvider>(),
+                    c.Resolve<IPublisherBaseGraphProvider>()
+                );
+
+                return jobActorProvider;
+            })
+            .As<IJobActorProvider<TAttach>>()
             .SingleInstance();
 
             return builder;

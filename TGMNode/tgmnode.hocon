@@ -1,12 +1,10 @@
 ﻿ akka {
         actor {
             serializers {
-                json = "Akka.Serialization.NewtonSoftJsonSerializer"
-                bytes = "Akka.Serialization.ByteArraySerializer"
+              hyperion = "Akka.Serialization.HyperionSerializer, Akka.Serialization.Hyperion"
             }
             serialization-bindings {
-              "System.Byte[]" = bytes
-              "System.Object" = json
+              "System.Object" = hyperion
             }
         }
         loggers = ["Akka.Logger.Serilog.SerilogLogger, Akka.Logger.Serilog"]

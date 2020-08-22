@@ -74,7 +74,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< DbContext.StoreOrUpdate >>>: {ex.ToString()}");
+                logger.LogError($"<<< DbContext.StoreOrUpdate >>>: {ex}");
             }
 
             return Task.FromResult<TValue>(default);
@@ -95,7 +95,7 @@ namespace TGMCore.Model
             }
             catch (Exception ex)
             {
-                logger.LogError($"<<< DbContext.LoadAll >>>: {ex.ToString()}");
+                logger.LogError($"<<< DbContext.LoadAll >>>: {ex}");
             }
 
             for (int i = 0, valuesCount = values.Count(); i < valuesCount; i++)

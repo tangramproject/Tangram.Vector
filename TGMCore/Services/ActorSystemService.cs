@@ -1,11 +1,12 @@
 ﻿using Akka.Actor;
 using Akka.Configuration;
+using Akka.Event;
 using Akka.Remote;
 using TGMCore.Actors;
 
 namespace TGMCore.Services
 {
-    public class ActorService : IActorService
+    public class ActorSystemService : IActorSystemService
     {
         public string Name { get; private set; }
 
@@ -30,9 +31,11 @@ namespace TGMCore.Services
 
             Get = ActorSystem.Create(Name, config);
 
-            var terminatorActor = Get.ActorOf(Props.Create<TerminatorActor>());
+            var terminatorActor = Get.ActorOf(Props.Create(() => new TerminatorActor(this)));
+            var deadLettersSubscriberActor = Get.ActorOf<DeadLetterMonitorActor>("dl-subscriber");
 
             Get.EventStream.Subscribe(terminatorActor, typeof(ThisActorSystemQuarantinedEvent));
+            Get.EventStream.Subscribe(deadLettersSubscriberActor, typeof(DeadLetter));
         }
 
         /// <summary>

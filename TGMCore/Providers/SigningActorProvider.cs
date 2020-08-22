@@ -3,12 +3,12 @@
 
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Routing;
 using TGMCore.Messages;
 using TGMCore.Model;
 using TGMCore.Models;
 using Microsoft.AspNetCore.DataProtection;
 using TGMCore.Actors;
+using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
@@ -21,10 +21,10 @@ namespace TGMCore.Providers
             actor = actorSystem.ActorOf(props, "signing-actor");
         }
 
-        public SigningActorProvider(ActorSystem actorSystem, IDataProtectionProvider dataProtectionProvider, IUnitOfWork unitOfWork)
+        public SigningActorProvider(IActorSystemService actorSystemService, IDataProtectionProvider dataProtectionProvider, IUnitOfWork unitOfWork)
         {
-            var actorProps = SigningActor.Create(dataProtectionProvider, unitOfWork).WithRouter(new RoundRobinPool(5));
-            actor = actorSystem.ActorOf(actorProps, "signing-actor");
+            var actorProps = SigningActor.Create(dataProtectionProvider, unitOfWork);
+            actor = actorSystemService.Get.ActorOf(actorProps, "signing-actor");
         }
 
         /// <summary>

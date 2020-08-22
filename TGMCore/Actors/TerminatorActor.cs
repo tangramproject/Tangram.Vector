@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Akka.Actor;
+﻿using Akka.Actor;
 using Akka.Remote;
 using TGMCore.Services;
 
@@ -8,9 +6,9 @@ namespace TGMCore.Actors
 {
     public class TerminatorActor: ReceiveActor
     {
-        private readonly IActorService _actorService;
+        private readonly IActorSystemService _actorService;
 
-        public TerminatorActor(IActorService actorService)
+        public TerminatorActor(IActorSystemService actorService)
         {
             _actorService = actorService;
 

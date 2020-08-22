@@ -4,10 +4,10 @@
 using System;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Routing;
 using TGMCore.Messages;
 using TGMCore.Model;
 using Microsoft.Extensions.Logging;
+using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
@@ -15,11 +15,11 @@ namespace TGMCore.Providers
     {
         private readonly IActorRef actor;
 
-        public InterpretActorProvider(ActorSystem actorSystem, Func<IUnitOfWork, ISigningActorProvider, Props> invoker,
+        public InterpretActorProvider(IActorSystemService actorSystemService, Func<IUnitOfWork, ISigningActorProvider, Props> invoker,
             IUnitOfWork unitOfWork, ISigningActorProvider signingActorProvider, ILogger<InterpretActorProvider<TModel>> logger)
         {
-            var actorProps = invoker(unitOfWork, signingActorProvider).WithRouter(new RoundRobinPool(5));
-            actor = actorSystem.ActorOf(actorProps, "interpret-actor");
+            var actorProps = invoker(unitOfWork, signingActorProvider);
+            actor = actorSystemService.Get.ActorOf(actorProps, "interpret-actor");
         }
 
         /// <summary>

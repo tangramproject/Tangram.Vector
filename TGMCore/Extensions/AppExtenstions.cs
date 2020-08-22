@@ -33,9 +33,9 @@ namespace TGMCore.Extensions
         /// <typeparam name="TAttach"></typeparam>
         /// <param name="builder"></param>
         /// <returns></returns>
-        public static ContainerBuilder AddBActorService<TAttach>(this ContainerBuilder builder)
+        public static ContainerBuilder AddActorSystemService(this ContainerBuilder builder)
         {
-            builder.RegisterType<ActorService>().As<IActorService>().SingleInstance();
+            builder.RegisterType<ActorSystemService>().As<IActorSystemService>().SingleInstance();
             return builder;
         }
 

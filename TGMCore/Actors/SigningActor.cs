@@ -63,6 +63,8 @@ namespace TGMCore.Actors
         /// <returns></returns>
         private async Task<KeyPairMessage> CreateKeyPurpose(KeyPurposeMessage message)
         {
+            KeyPairMessage kp = null;
+
             try
             {
                 _dataProtector = _dataProtectionProvider.CreateProtector(message.Purpose);
@@ -84,14 +86,14 @@ namespace TGMCore.Actors
                     }
                 }
 
-                return GetKeyPair();
+                kp = GetKeyPair();
             }
             catch (Exception ex)
             {
                 _logger.Error($"<<< SigningActor.CreateKeyPurpose >>>: {ex}");
             }
 
-            return null;
+            return kp;
         }
 
         /// <summary>
@@ -122,24 +124,25 @@ namespace TGMCore.Actors
             if (message.Round <= 0)
                 throw new ArgumentOutOfRangeException(nameof(message.Round));
 
+            Models.SignedHashResponse signedHashResponse = null;
+
             try
             {
                 var keyPair = GetKeyPair();
                 var byteArray = Util.SerializeProto(message.Model);
-                var signedHashResponse = new Models.SignedHashResponse
+
+                signedHashResponse = new Models.SignedHashResponse
                 {
                     PublicKey = keyPair.PublicKey.FromHex(),
                     Signature = Curve.calculateSignature(Curve.decodePrivatePoint(keyPair.SecretKey.FromHex()), byteArray)
                 };
-
-                return signedHashResponse;
             }
             catch (Exception ex)
             {
                 _logger.Error($"<<< SigningActor.Sign >>>: {ex}");
             }
 
-            return null;
+            return signedHashResponse;
         }
 
         /// <summary>

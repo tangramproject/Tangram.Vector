@@ -2,7 +2,7 @@
 
 namespace TGMCore.Services
 {
-    public interface IActorService
+    public interface IActorSystemService
     {
         ActorSystem Get { get; }
 

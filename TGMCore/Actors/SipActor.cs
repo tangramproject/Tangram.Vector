@@ -98,12 +98,12 @@ namespace TGMCore.Actors
             if (!BoostGraphs.TryGetValue(hash.ToHex(), out IActorRef actorRef))
             {
                 var name = $"graph-actor-{Helper.Util.HashToId(hash.ToHex())}";
-                var boostGraphActorProps = GraphActor<TAttach>.Create(_unitOfWork, _clusterProvider, _interpretActorProvider, _processActorProvider, _signingActorProvider, _pubProvider);
-                var @ref = Context.ActorOf(boostGraphActorProps, name);
+                //var boostGraphActorProps = GraphActor<TAttach>.Create(_unitOfWork, _clusterProvider, _interpretActorProvider, _processActorProvider, _signingActorProvider, _pubProvider);
+                //var @ref = Context.ActorOf(boostGraphActorProps, name);
 
-                BoostGraphs.TryAdd(hash.ToHex(), @ref);
+                //BoostGraphs.TryAdd(hash.ToHex(), @ref);
 
-                return @ref;
+                //return @ref;
             }
 
             return actorRef;

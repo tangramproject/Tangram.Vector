@@ -63,17 +63,19 @@ namespace TGMNode
         {
             builder.AddDbContext();
             builder.AddUnitOfWork();
+            builder.AddActorSystemService();
             builder.AddActorSystem("tangram-system", "tgmnode.hocon");
+            builder.AddGraphActorProvider<TransactionProto>();
+            builder.AddJobActorProvider<TransactionProto>();
             builder.AddSigningActorProvider();
             builder.AddInterpretActorProvider<TransactionProto>(InterpretBlockActor.Create);
             builder.AddProcessActorProvider<TransactionProto>();
-            builder.AddSipActorProvider<Startup, TransactionProto>();
             builder.AddBlockGraphService<TransactionProto>();
             builder.AddTransactionService();
             builder.AddVerifiableFunctionsActorProvider();
             builder.AddClusterProvider("tgmnode.hocon");
-            builder.AddPublisherProvider<TransactionProto>("blockgraph");
-            builder.AddSubscriberProvider<TransactionProto>("blockgraph");
+            builder.AddPublisherBaseGraphProvider<TransactionProto>();
+            builder.AddSubscriberBaseGraphProvider<TransactionProto>();
             builder.AddDataKeysProtection();
         }
 
@@ -111,8 +113,7 @@ namespace TGMNode
             lifetime.ApplicationStarted.Register(() =>
             {
                 AutofacContainer.Resolve<ActorSystem>();
-                AutofacContainer.Resolve<ISipActorProvider>();
-                AutofacContainer.Resolve<ISubProvider>();
+                AutofacContainer.Resolve<ISubscriberBaseGraphProvider>();
             });
 
             lifetime.ApplicationStopping.Register(() =>

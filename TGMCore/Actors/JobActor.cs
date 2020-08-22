@@ -19,17 +19,17 @@ namespace TGMCore.Actors
     public class JobActor<TAttach> : ReceiveActor
     {
         private readonly IClusterProvider _clusterProvider;
-        private readonly IPubProvider _pubProvider;
+        private readonly IPublisherBaseGraphProvider _publisherBaseGraphProvider;
         private readonly ILoggingAdapter _logger;
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
 
         public byte[] Id { get; private set; }
 
-        public JobActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IPubProvider pubProvider)
+        public JobActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IPublisherBaseGraphProvider publisherBaseGraphProvider)
         {
             _clusterProvider = clusterProvider;
-            _pubProvider = pubProvider;
+            _publisherBaseGraphProvider = publisherBaseGraphProvider;
             _logger = Context.GetLogger();
             _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             _jobRepository = unitOfWork.CreateJobOf<TAttach>();
@@ -59,7 +59,7 @@ namespace TGMCore.Actors
 
                 if (!Id.SequenceEqual(message.Hash))
                 {
-                    Shutdown(message, $"<<< JobActor.Register >>>: Received hash mismatch. Got: ({message.Hash}) Expected: ({Id})");
+                    _logger.Error($"<<< JobActor.Register >>>: Received hash mismatch. Got: ({message.Hash}) Expected: ({Id})"));
                     return;
                 }
 
@@ -72,37 +72,13 @@ namespace TGMCore.Actors
                     await _baseGraphRepository.Include(blocks, _clusterProvider.GetSelfUniqueAddress());
                     await AddOrUpdateJob(blockHashLookup);
 
-                    _pubProvider.Publish(ChatMessage.Empty());
+                    _publisherBaseGraphProvider.Publish(message);
                 }
             }
             catch (Exception ex)
             {
                 _logger.Error($"<<< JobActor.Register >>>: {ex}");
             }
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="message"></param>
-        /// <param name="reason"></param>
-        private void Shutdown(HashedMessage message, string reason)
-        {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
-
-            if (message.Hash == null)
-                throw new ArgumentNullException(nameof(message.Hash));
-
-            if (message.Hash.Length != 33)
-                throw new ArgumentOutOfRangeException(nameof(message.Hash));
-
-            if (string.IsNullOrEmpty(reason))
-                throw new ArgumentNullException(nameof(reason));
-
-            _logger.Warning(reason);
-
-            Context.Stop(Self);
         }
 
         /// <summary>
@@ -217,7 +193,6 @@ namespace TGMCore.Actors
         {
             if (job.Nodes.Any())
             {
-
                 var nodes = job.Nodes?.Except(next.Deps.Select(x => x.Block.Node));
                 if (nodes.Any() != true)
                 {
@@ -275,8 +250,8 @@ namespace TGMCore.Actors
         /// <param name="unitOfWork"></param>
         /// <param name="clusterProvider"></param>
         /// <returns></returns>
-        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IPubProvider pubProvider) =>
-            Props.Create(() => new JobActor<TAttach>(unitOfWork, clusterProvider, pubProvider));
+        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, IPublisherBaseGraphProvider publisherBaseGraphProvider) =>
+            Props.Create(() => new JobActor<TAttach>(unitOfWork, clusterProvider, publisherBaseGraphProvider));
 
     }
 }

@@ -8,19 +8,19 @@ using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
-    public class SubscriberBaseGraphProvider<TAttach> : ISubProvider
+    public class SubscriberBaseGraphProvider<TAttach> : ISubscriberBaseGraphProvider
     {
         private readonly IActorRef _actor;
         private readonly ILogger _logger;
 
-        public SubscriberBaseGraphProvider(ActorSystem actorSystem, string topic, IBlockGraphService<TAttach> blockGraphService,
+        public SubscriberBaseGraphProvider(IActorSystemService actorSystemService, IBlockGraphService<TAttach> blockGraphService,
             ILogger<SubscriberBaseGraphProvider<TAttach>> logger)
         {
             _logger = logger;
 
-            var subscriber = SubscriberBaseGraphActor<TAttach>.Create(topic, blockGraphService);
+            var subscriber = SubscriberBaseGraphActor<TAttach>.Create(blockGraphService);
 
-            _actor = actorSystem.ActorOf(subscriber, "subscriber-actor");
+            _actor = actorSystemService.Get.ActorOf(subscriber, "subscriber-actor");
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using TGMCore.Messages;
 using TGMCore.Actors;
+using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
@@ -17,10 +18,10 @@ namespace TGMCore.Providers
             actor = actorSystem.ActorOf(props, "vf-actor");
         }
 
-        public VerifiableFunctionsActorProvider(ActorSystem actorSystem, ISigningActorProvider signingActorProvider)
+        public VerifiableFunctionsActorProvider(IActorSystemService actorSystemService, ISigningActorProvider signingActorProvider)
         {
             var actorProps = VerifiableFunctionsActor.Create(signingActorProvider);
-            actor = actorSystem.ActorOf(actorProps, "vf-actor");
+            actor = actorSystemService.Get.ActorOf(actorProps, "vf-actor");
         }
 
         /// <summary>

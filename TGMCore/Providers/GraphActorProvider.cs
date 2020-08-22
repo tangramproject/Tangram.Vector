@@ -6,27 +6,22 @@ using Akka.Actor;
 using TGMCore.Actors;
 using TGMCore.Messages;
 using TGMCore.Model;
+using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
     public class GraphActorProvider<TAttach> : IGraphActorProvider<TAttach>
     {
-        private readonly IActorRef actor;
+        private readonly IActorRef _actor;
 
-        public GraphActorProvider(ActorSystem actotSystem, IUnitOfWork unitOfWork,
+        public GraphActorProvider(IActorSystemService actorSystemService, IUnitOfWork unitOfWork,
             IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
             IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider,
-            IPubProvider pubProvider)
+            IJobActorProvider<TAttach> jobActorProvider)
         {
-            actor = actotSystem.ActorOf(Props.Create(() => new GraphActor<TAttach>
-                (
-                    unitOfWork,
-                    clusterProvider,
-                    interpretActorProvider,
-                    processActorProvider,
-                    signingActorProvider,
-                    pubProvider
-                )), "graph-actor");
+
+            var graphActorProps = GraphActor<TAttach>.Create(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, jobActorProvider);
+            _actor = actorSystemService.Get.ActorOf(graphActorProps, "graph-actor");
         }
 
         /// <summary>
@@ -36,7 +31,7 @@ namespace TGMCore.Providers
         /// <returns></returns>
         public Task Process(ProcessBlockMessage<TAttach> message)
         {
-            actor.Tell(message);
+            _actor.Tell(message);
             return Task.CompletedTask;
         }
 
@@ -47,7 +42,7 @@ namespace TGMCore.Providers
         /// <returns></returns>
         public Task RegisterAsync(HashedMessage message)
         {
-            actor.Tell(message);
+            _actor.Tell(message);
             return Task.CompletedTask;
         }
     }

@@ -8,6 +8,7 @@ using TGMCore.Messages;
 using TGMCore.Model;
 using Microsoft.Extensions.Logging;
 using TGMCore.Actors;
+using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
@@ -17,7 +18,7 @@ namespace TGMCore.Providers
         private readonly IActorRef _actor;
         private readonly ILogger _logger;
 
-        public SipActorProvider(ActorSystem actorSystem, IUnitOfWork unitOfWork,
+        public SipActorProvider(IActorSystemService actorSystemService, IUnitOfWork unitOfWork,
             IClusterProvider clusterProvider, IInterpretActorProvider<TAttach> interpretActorProvider,
             IProcessActorProvider<TAttach> processActorProvider, ISigningActorProvider signingActorProvider,
             IPubProvider pubProvider, ILogger<SipActorProvider<TAttach>> logger)
@@ -27,7 +28,7 @@ namespace TGMCore.Providers
             var sipActorProps = SipActor<TAttach>
                 .Create(unitOfWork, clusterProvider, interpretActorProvider, processActorProvider, signingActorProvider, pubProvider);
 
-            _actor = actorSystem.ActorOf(sipActorProps, "sip-actor");
+            _actor = actorSystemService.Get.ActorOf(sipActorProps, "sip-actor");
         }
 
         /// <summary>

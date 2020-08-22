@@ -7,17 +7,25 @@ using Akka.Actor;
 using Akka.Cluster;
 using Akka.Configuration;
 using TGMCore.Actors.ClusterStrategy;
+using System.Threading;
+using TGMCore.Services;
 
 namespace TGMCore.Providers
 {
     public class ClusterProvider : IClusterProvider
     {
+        private static readonly ManualResetEvent asTerminatedEvent = new ManualResetEvent(false);
+
+        private readonly IActorSystemService _actorSystemService;
         private readonly Cluster _cluster;
         private readonly int _quorumSize;
 
-        public ClusterProvider(ActorSystem actorSystem, Config config)
+        public ClusterProvider(IActorSystemService actorSystemService, Config config)
         {
-            _cluster = Cluster.Get(actorSystem);
+            _actorSystemService = actorSystemService;
+            _cluster = Cluster.Get(_actorSystemService.Get);
+            _cluster.RegisterOnMemberRemoved(() => MemberRemoved(_actorSystemService.Get));
+
             _quorumSize = config.GetInt("akka.cluster.split-brain-resolver.static-quorum.quorum-size");
         }
 
@@ -67,6 +75,16 @@ namespace TGMCore.Providers
         public ulong GetSelfUniqueAddress()
         {
             return (ulong)_cluster.SelfUniqueAddress.Uid;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="actorSystem"></param>
+        private async void MemberRemoved(ActorSystem actorSystem)
+        {
+            await actorSystem.Terminate();
+            asTerminatedEvent.Set();
         }
     }
 }

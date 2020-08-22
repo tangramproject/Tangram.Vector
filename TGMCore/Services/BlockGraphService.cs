@@ -14,15 +14,36 @@ namespace TGMCore.Services
 {
     public class BlockGraphService<TAttach> : IBlockGraphService<TAttach>
     {
-        private readonly ISipActorProvider _sipActorProvider;
+        private readonly IGraphActorProvider<TAttach> _graphActorProvider;
         private readonly ILogger _logger;
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
 
-        public BlockGraphService(ISipActorProvider sipActorProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphService<TAttach>> logger)
+        public BlockGraphService(IGraphActorProvider<TAttach> graphActorProvider, IUnitOfWork unitOfWork, ILogger<BlockGraphService<TAttach>> logger)
         {
-            _sipActorProvider = sipActorProvider;
+            _graphActorProvider = graphActorProvider;
             _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
             _logger = logger;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="hash"></param>
+        /// <returns></returns>
+        public async Task<bool> HasKeyImage(byte[] hash)
+        {
+            BaseGraphProto<TAttach> blockGraph = null;
+
+            try
+            {
+                blockGraph = await  _baseGraphRepository.GetFirstOrDefault(x => x.Block.Hash == hash.ToHex());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"<<< BlockGraphService.HasKeyImage >>>: {ex}");
+            }
+
+            return blockGraph == null ? false : true;
         }
 
         /// <summary>
@@ -60,7 +81,7 @@ namespace TGMCore.Services
                     return null;
                 }
 
-                _sipActorProvider.Register(new HashedMessage(stored.Block.Hash.FromHex()));
+                await _graphActorProvider.RegisterAsync(new HashedMessage(stored.Block.Hash.FromHex()));
             }
             catch (Exception ex)
             {

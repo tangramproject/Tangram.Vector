@@ -9,5 +9,6 @@ namespace TGMCore.Services
     public interface IBlockGraphService<TAttach>
     {
         Task<BaseGraphProto<TAttach>> SetBlockGraph(BaseGraphProto<TAttach> blockGraph);
+        Task<bool> HasKeyImage(byte[] hash);
     }
 }

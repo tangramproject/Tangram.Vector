@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Cluster.Tools.PublishSubscribe;
@@ -13,6 +12,7 @@ using TGMCore.Providers;
 using TGMCore.Helper;
 using TGMCore.Model;
 using TGMCore.Messages;
+using TGMCore.Extentions;
 
 namespace TGMCore.Actors
 {
@@ -28,31 +28,24 @@ namespace TGMCore.Actors
         private readonly IBaseGraphRepository<TAttach> _baseGraphRepository;
         private readonly IJobRepository<TAttach> _jobRepository;
         private readonly IActorRef _mediator;
-        private readonly string _topic;
 
-        public PublisherBaseGraphActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, string topic = null)
+        public PublisherBaseGraphActor(IUnitOfWork unitOfWork, IClusterProvider clusterProvider)
         {
             _unitOfWork = unitOfWork;
             _clusterProvider = clusterProvider;
-            _topic = topic;
             _jobRepository = unitOfWork.CreateJobOf<TAttach>();
             _baseGraphRepository = unitOfWork.CreateBaseGraphOf<TAttach>();
-
             _mediator = DistributedPubSub.Get(Context.System).Mediator;
 
-            ReceiveAsync<ChatMessage>(async message => await Publish(message));
+            Ready();
         }
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="topic"></param>
-        /// <returns></returns>
-        private async Task Publish(ChatMessage message)
+        private void Ready()
         {
-            SemaphoreSlim throttler = null;
-
-            try
+            ReceiveAsync<HashedMessage>(async message =>
             {
                 if (_clusterProvider.AvailableMembersCount() == 0)
                 {
@@ -60,57 +53,20 @@ namespace TGMCore.Actors
                 }
 
                 var blockGraphs = await _baseGraphRepository
-                    .GetWhere(x => x.Block.Node == _clusterProvider.GetSelfUniqueAddress() && x.Included && !x.Replied);
+                    .GetWhere(x => x.Block.Node == _clusterProvider.GetSelfUniqueAddress() && x.Block.Hash.Equals(message.Hash.ToHex()) && x.Included && !x.Replied);
 
                 if (blockGraphs.Any() != true)
                 {
                     return;
                 }
 
-                var tasks = new List<Task>();
-                var numberOfBlocks = 100;
-                var numberOfBatches = (int)Math.Ceiling((double)numberOfBlocks / numberOfBlocks);
+                _mediator.Tell(new Publish(MessageType.BlockGraph.ToString(), Util.SerializeProto(blockGraphs)));
 
-                throttler = new SemaphoreSlim(int.MaxValue);
+                var blockInfos = blockGraphs.Select(x => new BlockInfoProto { Hash = x.Block.Hash, Node = x.Block.Node, Round = x.Block.Round });
 
-                var series = new long[numberOfBatches];
-                foreach (var n in series)
-                {
-                    var batch = blockGraphs.Skip((int)(n * numberOfBlocks)).Take(numberOfBlocks);
-                    if (batch.Any() != true)
-                    {
-                        break;
-                    }
-
-                    await throttler.WaitAsync();
-
-                    tasks.Add(Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var topic = _topic ?? message.Topic;
-                            _mediator.Tell(new Publish(topic, Util.SerializeProto(batch)));
-
-                            var blockInfos = batch.Select(x => new BlockInfoProto { Hash = x.Block.Hash, Node = x.Block.Node, Round = x.Block.Round });
-
-                            await MarkMultipleStatesAs(blockInfos, JobState.Queued);
-                            await MarkMultipleRepliesAs(blockInfos, true);
-                        }
-                        finally
-                        {
-                            throttler.Release();
-                        }
-                    }));
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.Error($"<<< PublisherActor.Publish >>>: {ex}");
-            }
-            finally
-            {
-                throttler?.Dispose();
-            }
+                await MarkMultipleStatesAs(blockInfos, JobState.Queued);
+                await MarkMultipleRepliesAs(blockInfos, true);
+            });
         }
 
         /// <summary>
@@ -129,7 +85,7 @@ namespace TGMCore.Actors
                 using (await _markStatesAsMutex.LockAsync())
                 {
                     if (blockInfos.Any() != true)
-                    {
+                    {   
                         return;
                     }
 
@@ -145,7 +101,7 @@ namespace TGMCore.Actors
                             case JobState.Answered:
                             case JobState.Dialling:
                                 i.Current.Result.Status = state;
-                                session.Store(i.Current, null, i.Current.Result.Id);
+                                session.Store(i.Current.Result, null, i.Current.Result.Id);
                                 break;
                             case JobState.Running:
                                 break;
@@ -200,7 +156,9 @@ namespace TGMCore.Actors
                     foreach (var next in blockInfos)
                     {
                         var blockGraph = await _baseGraphRepository
-                            .GetFirstOrDefault(x => x.Block.Hash == next.Hash && x.Block.Node == _clusterProvider.GetSelfUniqueAddress() && x.Block.Round.Equals(next.Round));
+                            .GetFirstOrDefault(x =>
+                            x.Block.Hash == next.Hash && x.Block.Node == _clusterProvider.GetSelfUniqueAddress() && x.Block.Round.Equals(next.Round));
+
                         if (blockGraph != null)
                         {
                             blockGraph.Replied = replied;
@@ -224,10 +182,9 @@ namespace TGMCore.Actors
         /// </summary>
         /// <param name="unitOfWork"></param>
         /// <param name="clusterProvider"></param>
-        /// <param name="baseGraphRepository"></param>
-        /// <param name="jobRepository"></param>
+        /// <param name="topic"></param>
         /// <returns></returns>
-        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider, string topic) =>
-            Props.Create(() => new PublisherBaseGraphActor<TAttach>(unitOfWork, clusterProvider, topic));
+        public static Props Create(IUnitOfWork unitOfWork, IClusterProvider clusterProvider) =>
+            Props.Create(() => new PublisherBaseGraphActor<TAttach>(unitOfWork, clusterProvider));
     }
 }
